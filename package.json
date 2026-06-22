@@ -1,0 +1,33 @@
+{
+  "name": "@tmcopilot/cli",
+  "version": "0.1.0",
+  "description": "The official CLI for TMCopilot",
+  "bin": {
+    "tmc": "scripts/run.js",
+    "tmcopilot": "scripts/run.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huski-inc/tmcopilot-cli.git"
+  },
+  "license": "UNLICENSED",
+  "files": [
+    "scripts/install.js",
+    "scripts/run.js"
+  ]
+}

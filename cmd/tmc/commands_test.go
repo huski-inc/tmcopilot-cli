@@ -291,6 +291,260 @@ func TestAuthLoginAuthorizesInBrowserAndStoresAPIKey(t *testing.T) {
 	}
 }
 
+func TestAuthLoginNoWaitStoresPendingAuthorizationOnly(t *testing.T) {
+	var sawCreateAuthorization bool
+	var gotDeviceUUID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/auth/api-key-authorizations":
+			sawCreateAuthorization = true
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode authorization body: %v", err)
+			}
+			gotDeviceUUID, _ = body["device_uuid"].(string)
+			if gotDeviceUUID == "" {
+				t.Fatalf("device_uuid was not sent: %#v", body)
+			}
+			if body["device_name"] != "Codex CLI" {
+				t.Fatalf("device_name = %#v", body["device_name"])
+			}
+			_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"authorization_id":"akreq_1","authorization_url":"https://app.example.test/api-key-authorize?request_id=akreq_1","poll_token":"poll_token_1","authorization_expires_in":60,"interval":0}}`))
+		case "/api/v1/auth/api-key-authorizations/akreq_1/result", "/api/v1/auth/me":
+			t.Fatalf("no-wait should not poll or check credentials, got path: %s", r.URL.Path)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	home := t.TempDir()
+	t.Setenv("TMCOPILOT_HOME", home)
+	t.Setenv("TMCOPILOT_API_KEY", "")
+	t.Setenv("TMC_API_KEY", "")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"auth", "login",
+		"--no-wait",
+		"--device-name", "Codex CLI",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("auth login --no-wait failed: %v stderr=%s", err, stderr.String())
+	}
+	if !sawCreateAuthorization {
+		t.Fatal("authorization request was not created")
+	}
+	if _, err := os.Stat(filepath.Join(home, "credentials.json")); !os.IsNotExist(err) {
+		t.Fatalf("credentials should not be written during no-wait, stat err=%v", err)
+	}
+	store, err := loadPendingAuthorizationStore()
+	if err != nil {
+		t.Fatalf("load pending store: %v", err)
+	}
+	pending, ok := store.Authorizations["akreq_1"]
+	if !ok {
+		t.Fatalf("pending authorization not stored: %#v", store.Authorizations)
+	}
+	if pending.PollToken != "poll_token_1" || pending.DeviceUUID != gotDeviceUUID || pending.DeviceName != "Codex CLI" {
+		t.Fatalf("pending authorization mismatch: %#v", pending)
+	}
+
+	var result struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Stored        bool   `json:"stored"`
+			ResumeCommand string `json:"resume_command"`
+			SetupResume   string `json:"setup_resume"`
+			Authorization struct {
+				ID               string `json:"id"`
+				Status           string `json:"status"`
+				AuthorizationURL string `json:"authorization_url"`
+			} `json:"authorization"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode no-wait result: %v output=%s", err, stdout.String())
+	}
+	if result.Data.Stored || result.Data.Authorization.ID != "akreq_1" || result.Data.Authorization.Status != "pending" {
+		t.Fatalf("no-wait result mismatch: %#v", result.Data)
+	}
+	if result.Data.ResumeCommand != "tmc auth login --request-id akreq_1" || result.Data.SetupResume != "tmc setup --request-id akreq_1" {
+		t.Fatalf("resume commands mismatch: %#v", result.Data)
+	}
+	if result.Data.Authorization.AuthorizationURL != "https://app.example.test/api-key-authorize?request_id=akreq_1" {
+		t.Fatalf("authorization url = %q", result.Data.Authorization.AuthorizationURL)
+	}
+	for _, leaked := range [][]byte{
+		[]byte("poll_token_1"),
+		[]byte(gotDeviceUUID),
+	} {
+		if bytes.Contains(stdout.Bytes(), leaked) || bytes.Contains(stderr.Bytes(), leaked) {
+			t.Fatalf("no-wait output leaked secret %q: stdout=%s stderr=%s", leaked, stdout.String(), stderr.String())
+		}
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte(`tmc auth login --request-id akreq_1`)) {
+		t.Fatalf("stderr missing resume command: %s", stderr.String())
+	}
+}
+
+func TestAuthLoginRequestIDResumesPendingAuthorization(t *testing.T) {
+	var createCalls, pollCalls, checkCalls int
+	var gotDeviceUUID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/auth/api-key-authorizations":
+			createCalls++
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode authorization body: %v", err)
+			}
+			gotDeviceUUID, _ = body["device_uuid"].(string)
+			if gotDeviceUUID == "" {
+				t.Fatalf("device_uuid was not sent: %#v", body)
+			}
+			_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"authorization_id":"akreq_1","authorization_url":"https://app.example.test/api-key-authorize?request_id=akreq_1","poll_token":"poll_token_1","authorization_expires_in":60,"interval":0}}`))
+		case "/api/v1/auth/api-key-authorizations/akreq_1/result":
+			pollCalls++
+			if got := r.Header.Get("Authorization"); got != "Bearer poll_token_1" {
+				t.Fatalf("poll Authorization header = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"status":"approved","api_key":"tmc_authorized_key","key":{"id":"key_1","name":"Codex CLI","bound_device_uuid":"` + gotDeviceUUID + `","bound_device_name":"Codex CLI","key_prefix":"tmc_aut","created_at":1710000000}}}`))
+		case "/api/v1/auth/me":
+			checkCalls++
+			if got := r.Header.Get("Authorization"); got != "Bearer tmc_authorized_key" {
+				t.Fatalf("check Authorization header = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"email":"user@example.com"}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "")
+	t.Setenv("TMC_API_KEY", "")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"auth", "login",
+		"--no-wait",
+		"--device-name", "Codex CLI",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("auth login --no-wait failed: %v stderr=%s", err, stderr.String())
+	}
+	if createCalls != 1 || pollCalls != 0 || checkCalls != 0 {
+		t.Fatalf("unexpected calls after no-wait: create=%d poll=%d check=%d", createCalls, pollCalls, checkCalls)
+	}
+	for _, leaked := range [][]byte{[]byte("poll_token_1"), []byte("tmc_authorized_key")} {
+		if bytes.Contains(stdout.Bytes(), leaked) || bytes.Contains(stderr.Bytes(), leaked) {
+			t.Fatalf("no-wait output leaked secret %q: stdout=%s stderr=%s", leaked, stdout.String(), stderr.String())
+		}
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"auth", "login",
+		"--request-id", "akreq_1",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("auth login --request-id failed: %v stderr=%s", err, stderr.String())
+	}
+	if createCalls != 1 || pollCalls != 1 || checkCalls != 1 {
+		t.Fatalf("unexpected calls after resume: create=%d poll=%d check=%d", createCalls, pollCalls, checkCalls)
+	}
+	creds, err := config.LoadCredentials()
+	if err != nil {
+		t.Fatalf("load credentials: %v", err)
+	}
+	if got := creds.Profiles[config.DefaultProfile].APIKey; got != "tmc_authorized_key" {
+		t.Fatalf("stored api key = %q", got)
+	}
+	store, err := loadPendingAuthorizationStore()
+	if err != nil {
+		t.Fatalf("load pending store: %v", err)
+	}
+	if _, ok := store.Authorizations["akreq_1"]; ok {
+		t.Fatalf("pending authorization was not removed: %#v", store.Authorizations)
+	}
+	for _, leaked := range [][]byte{
+		[]byte("tmc_authorized_key"),
+		[]byte("poll_token_1"),
+		[]byte("key_1"),
+		[]byte("tmc_aut"),
+		[]byte(gotDeviceUUID),
+		[]byte("user@example.com"),
+		[]byte(`"key_prefix"`),
+		[]byte(`"bound_device_uuid"`),
+	} {
+		if bytes.Contains(stdout.Bytes(), leaked) || bytes.Contains(stderr.Bytes(), leaked) {
+			t.Fatalf("resume output leaked secret %q: stdout=%s stderr=%s", leaked, stdout.String(), stderr.String())
+		}
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"stored":true`)) ||
+		!bytes.Contains(stdout.Bytes(), []byte(`"id":"akreq_1"`)) ||
+		!bytes.Contains(stdout.Bytes(), []byte(`"verified":true`)) {
+		t.Fatalf("resume result missing status: %s", stdout.String())
+	}
+}
+
+func TestSetupNoWaitPrintsSetupResumeCommand(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/auth/api-key-authorizations" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"authorization_id":"akreq_setup","authorization_url":"https://app.example.test/api-key-authorize?request_id=akreq_setup","poll_token":"poll_token_setup","authorization_expires_in":60,"interval":0}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "")
+	t.Setenv("TMC_API_KEY", "")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"setup",
+		"--no-wait",
+		"--device-name", "Codex CLI",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("setup --no-wait failed: %v stderr=%s", err, stderr.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte(`tmc setup --request-id akreq_setup`)) {
+		t.Fatalf("stderr missing setup resume command: %s", stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"setup_resume":"tmc setup --request-id akreq_setup"`)) {
+		t.Fatalf("stdout missing setup resume command: %s", stdout.String())
+	}
+	for _, leaked := range [][]byte{[]byte("poll_token_setup")} {
+		if bytes.Contains(stdout.Bytes(), leaked) || bytes.Contains(stderr.Bytes(), leaked) {
+			t.Fatalf("setup no-wait output leaked secret %q: stdout=%s stderr=%s", leaked, stdout.String(), stderr.String())
+		}
+	}
+}
+
 func TestAuthLoginAuthorizationRequestOutAndIdempotencyHeader(t *testing.T) {
 	var sawCreateAuthorization bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -866,6 +1120,161 @@ func TestSchemaShowsEndpointMetadata(t *testing.T) {
 	}
 	if bytes.Contains(stdout.Bytes(), []byte(`"definitions"`)) {
 		t.Fatalf("schema output should not include raw OpenAPI definitions by default: %s", stdout.String())
+	}
+}
+
+func TestSchemaIncludesAgentSafetyMetadata(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "search", "trademarks"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var searchSchema struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Safety struct {
+				ReadOnly    bool `json:"read_only"`
+				SideEffect  bool `json:"side_effect"`
+				Destructive bool `json:"destructive"`
+			} `json:"safety"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &searchSchema); err != nil {
+		t.Fatalf("decode schema: %v output=%s", err, stdout.String())
+	}
+	if !searchSchema.Data.Safety.ReadOnly || searchSchema.Data.Safety.SideEffect || searchSchema.Data.Safety.Destructive {
+		t.Fatalf("search safety metadata mismatch: %#v", searchSchema.Data.Safety)
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "gap", "delete"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("delete schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var deleteSchema struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Safety struct {
+				SideEffect  bool `json:"side_effect"`
+				Destructive bool `json:"destructive"`
+				RequiresYes bool `json:"requires_yes"`
+			} `json:"safety"`
+			Examples []string `json:"examples"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &deleteSchema); err != nil {
+		t.Fatalf("decode delete schema: %v output=%s", err, stdout.String())
+	}
+	if !deleteSchema.Data.Safety.SideEffect || !deleteSchema.Data.Safety.Destructive || !deleteSchema.Data.Safety.RequiresYes {
+		t.Fatalf("delete safety metadata mismatch: %#v", deleteSchema.Data.Safety)
+	}
+	if len(deleteSchema.Data.Examples) == 0 {
+		t.Fatalf("delete schema missing examples: %s", stdout.String())
+	}
+}
+
+func TestSchemaIncludesPaginationMetadata(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "portfolio", "trademarks", "list"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var schema struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Pagination struct {
+				SupportsPageAll   bool     `json:"supports_page_all"`
+				SupportsFields    bool     `json:"supports_fields"`
+				SupportsManifest  bool     `json:"supports_manifest"`
+				RecommendedFormat string   `json:"recommended_format"`
+				Flags             []string `json:"flags"`
+			} `json:"pagination"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &schema); err != nil {
+		t.Fatalf("decode schema: %v output=%s", err, stdout.String())
+	}
+	if !schema.Data.Pagination.SupportsPageAll || !schema.Data.Pagination.SupportsFields || !schema.Data.Pagination.SupportsManifest {
+		t.Fatalf("pagination metadata mismatch: %#v", schema.Data.Pagination)
+	}
+	if schema.Data.Pagination.RecommendedFormat != "ndjson" {
+		t.Fatalf("recommended format = %q", schema.Data.Pagination.RecommendedFormat)
+	}
+}
+
+func TestAgentBootstrapReturnsMachineReadableGuidance(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/auth/me" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
+			t.Fatalf("authorization header mismatch: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"email":"agent@example.com"}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"--endpoint", server.URL, "agent", "bootstrap", "--check"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("agent bootstrap failed: %v stderr=%s", err, stderr.String())
+	}
+	var result struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			CLI struct {
+				Commands []string `json:"commands"`
+			} `json:"cli"`
+			Auth struct {
+				Configured bool `json:"configured"`
+				Verified   bool `json:"verified"`
+			} `json:"auth"`
+			Skills []struct {
+				Name string `json:"name"`
+			} `json:"skills"`
+			Discovery struct {
+				Schema string `json:"schema"`
+			} `json:"discovery"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode bootstrap: %v output=%s", err, stdout.String())
+	}
+	if !result.Data.Auth.Configured || !result.Data.Auth.Verified {
+		t.Fatalf("auth metadata mismatch: %#v", result.Data.Auth)
+	}
+	if !reflect.DeepEqual(result.Data.CLI.Commands, []string{"tmc", "tmcopilot"}) {
+		t.Fatalf("commands = %#v", result.Data.CLI.Commands)
+	}
+	if len(result.Data.Skills) == 0 {
+		t.Fatalf("bootstrap missing skills: %s", stdout.String())
+	}
+	if result.Data.Discovery.Schema != "tmc schema <command...>" {
+		t.Fatalf("schema discovery = %q", result.Data.Discovery.Schema)
+	}
+	if bytes.Contains(stdout.Bytes(), []byte("agent@example.com")) {
+		t.Fatalf("bootstrap leaked user profile data: %s", stdout.String())
 	}
 }
 

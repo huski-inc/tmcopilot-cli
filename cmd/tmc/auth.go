@@ -39,6 +39,10 @@ TMCopilot, and store it for the active profile.
 
 The raw API key is stored locally and is never printed. For scripts and CI,
 use tmc auth import-key or tmc setup --api-key-stdin with an existing API key.`,
+		Example: `  tmc auth login
+  tmc auth login --no-wait
+  tmc auth login --request-id <request_id>
+  tmc auth login --no-browser`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return handleCommand(cmd, func() error {
 				if opts.dryRun {
@@ -49,6 +53,8 @@ use tmc auth import-key or tmc setup --api-key-stdin with an existing API key.`,
 		},
 	}
 	cmd.Flags().BoolVar(&loginOpts.NoBrowser, "no-browser", false, "print the authorization URL instead of opening a browser")
+	cmd.Flags().BoolVar(&loginOpts.NoWait, "no-wait", false, "create an authorization request, save it locally, print the URL, and exit without polling")
+	cmd.Flags().StringVar(&loginOpts.RequestID, "request-id", "", "resume polling for a pending authorization request created by --no-wait")
 	cmd.Flags().StringVar(&loginOpts.DeviceName, "device-name", "", "device name shown on the authorization page")
 	cmd.Flags().StringVar(&loginOpts.KeyName, "key-name", "", "alias for --device-name; legacy API key name with --email")
 	cmd.Flags().StringVar(&loginOpts.Email, "email", "", "legacy password login account email")
@@ -115,7 +121,7 @@ func newAuthStatusCommand(opts *globalOptions) *cobra.Command {
 					"api_key_source": rt.APIKeySrc,
 				}
 				if rt.APIKey == "" {
-					result["next"] = "run `tmc setup` or `tmc auth login`"
+					result["next"] = "run `tmc setup` in a browser terminal or `tmc setup --no-wait` in an agent environment"
 				}
 				if check && rt.APIKey != "" {
 					resp, err := rt.Client.Do(cmd.Context(), "GET", "/auth/me", nil, nil)

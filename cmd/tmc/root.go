@@ -102,6 +102,7 @@ USAGE:
 
 DISCOVERY:
   Start with embedded agent guidance:
+    tmc agent bootstrap
     tmc skills list
     tmc skills read tmc-shared
     tmc skills read tmc-trademark-search
@@ -110,7 +111,9 @@ DISCOVERY:
   Swagger metadata, then fall back to raw API calls for endpoints without a
   first-class CLI command.`,
 		Example: `  tmc setup
+  tmc setup --no-wait
   tmc auth login
+  tmc agent bootstrap
   tmc search trademarks --name Nike --class 25,35 --limit 20
   tmc search owners --name "Nike"
   tmc portfolio trademarks list --page-all --format ndjson --output trademarks.ndjson
@@ -137,6 +140,7 @@ DISCOVERY:
 	root.AddCommand(newConfigProfileCommand(opts))
 	root.AddCommand(newAuthCommand(opts))
 	root.AddCommand(newDoctorCommand(opts))
+	root.AddCommand(newAgentCommand(opts))
 	root.AddCommand(newAPICommand(opts))
 	root.AddCommand(newSchemaCommand(opts))
 	root.AddCommand(newPortfolioCommand(opts))
@@ -180,7 +184,7 @@ func commandRuntime(cmd *cobra.Command, opts *globalOptions, needAuth bool) (*ru
 
 	apiKey, source := resolveAPIKey(profileName)
 	if needAuth && apiKey == "" {
-		return nil, errors.New("missing API key; run tmc setup or tmc auth login")
+		return nil, errors.New("missing API key; run tmc setup in a browser terminal or tmc setup --no-wait in an agent environment")
 	}
 
 	apiClient := client.New(
@@ -546,7 +550,7 @@ func classifyFailure(err error) output.Failure {
 		return output.Failure{
 			Type:    "auth_error",
 			Message: message,
-			Hint:    "run `tmc setup` for browser authorization, or import an existing key with `tmc setup --api-key-stdin`",
+			Hint:    "run `tmc setup` in a browser terminal, `tmc setup --no-wait` in an agent environment, or import an existing key with `tmc setup --api-key-stdin`",
 		}
 	}
 	return output.Failure{Type: "cli_error", Message: message}

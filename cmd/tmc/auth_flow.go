@@ -30,6 +30,8 @@ type loginCredentialOptions struct {
 	DeviceName        string
 	ExpiresIn         int64
 	NoBrowser         bool
+	NoWait            bool
+	RequestID         string
 	Check             bool
 }
 
@@ -77,6 +79,9 @@ func writeLoginSetupDryRun(cmd *cobra.Command, opts *globalOptions, loginOpts lo
 	if err != nil {
 		return err
 	}
+	if err := validateAuthorizationOptions(loginOpts); err != nil {
+		return err
+	}
 	plan, err := buildLoginSetupPlan(rt, loginOpts)
 	if err != nil {
 		return err
@@ -86,6 +91,9 @@ func writeLoginSetupDryRun(cmd *cobra.Command, opts *globalOptions, loginOpts lo
 }
 
 func buildLoginSetupPlan(rt *runtimeContext, loginOpts loginCredentialOptions) (map[string]any, error) {
+	if strings.TrimSpace(loginOpts.RequestID) != "" {
+		return buildResumeAuthorizationPlan(rt, loginOpts), nil
+	}
 	if usesLegacyPasswordLogin(loginOpts) {
 		return buildLegacyLoginSetupPlan(rt, loginOpts), nil
 	}
@@ -128,7 +136,19 @@ func buildLoginSetupPlan(rt *runtimeContext, loginOpts loginCredentialOptions) (
 			"credential": "<authorized_api_key>",
 		},
 	}
-	if loginOpts.Check {
+	if loginOpts.NoWait {
+		actions = actions[:1]
+		actions = append(actions, map[string]any{
+			"type":       "write_pending_authorization",
+			"profile":    rt.ProfileName,
+			"request_id": "<authorization_id>",
+			"path":       mustPendingAuthorizationsPath(),
+		}, map[string]any{
+			"type":           "print_authorization_url",
+			"url":            "<authorization_url>",
+			"resume_command": "tmc setup --request-id <authorization_id>",
+		})
+	} else if loginOpts.Check {
 		actions = append(actions, map[string]any{
 			"type":        "http_request",
 			"method":      "GET",
@@ -143,8 +163,58 @@ func buildLoginSetupPlan(rt *runtimeContext, loginOpts loginCredentialOptions) (
 		"auth_method":  "api_key_authorization",
 		"device_uuid":  deviceUUID,
 		"device_name":  deviceName,
+		"no_wait":      loginOpts.NoWait,
 		"actions":      actions,
 	}, nil
+}
+
+func buildResumeAuthorizationPlan(rt *runtimeContext, loginOpts loginCredentialOptions) map[string]any {
+	requestID := strings.TrimSpace(loginOpts.RequestID)
+	actions := []map[string]any{
+		{
+			"type":       "read_pending_authorization",
+			"profile":    rt.ProfileName,
+			"request_id": requestID,
+			"path":       mustPendingAuthorizationsPath(),
+		},
+		{
+			"type":        "http_poll",
+			"method":      "GET",
+			"path":        "/auth/api-key-authorizations/" + requestID + "/result",
+			"auth_source": "local_pending_poll_token",
+		},
+		{
+			"type":    "write_local_config",
+			"profile": rt.ProfileName,
+		},
+		{
+			"type":       "write_local_credentials",
+			"profile":    rt.ProfileName,
+			"credential": "<authorized_api_key>",
+		},
+		{
+			"type":       "delete_pending_authorization",
+			"request_id": requestID,
+			"path":       mustPendingAuthorizationsPath(),
+		},
+	}
+	if loginOpts.Check {
+		actions = append(actions, map[string]any{
+			"type":        "http_request",
+			"method":      "GET",
+			"path":        "/auth/me",
+			"auth_source": "authorized_api_key",
+		})
+	}
+	return map[string]any{
+		"profile":      rt.ProfileName,
+		"endpoint":     rt.Profile.Endpoint,
+		"workspace_id": rt.Profile.WorkspaceID,
+		"auth_method":  "api_key_authorization",
+		"request_id":   requestID,
+		"resume":       true,
+		"actions":      actions,
+	}
 }
 
 func buildLegacyLoginSetupPlan(rt *runtimeContext, loginOpts loginCredentialOptions) map[string]any {
@@ -299,7 +369,13 @@ func loginAndStoreAPIKey(cmd *cobra.Command, opts *globalOptions, loginOpts logi
 	if err != nil {
 		return err
 	}
+	if err := validateAuthorizationOptions(loginOpts); err != nil {
+		return err
+	}
 	if !usesLegacyPasswordLogin(loginOpts) {
+		if strings.TrimSpace(loginOpts.RequestID) != "" {
+			return resumeAndStoreAPIKeyAuthorization(cmd, opts, rt, loginOpts)
+		}
 		if loginOpts.ExpiresIn > 0 {
 			return fmt.Errorf("--expires-in is only supported with --email/--password-stdin legacy login; choose API key expiry in the browser authorization page")
 		}
@@ -357,6 +433,22 @@ func loginAndStoreAPIKey(cmd *cobra.Command, opts *globalOptions, loginOpts logi
 	return writeResult(rt, result, nil)
 }
 
+func validateAuthorizationOptions(loginOpts loginCredentialOptions) error {
+	if loginOpts.NoWait && strings.TrimSpace(loginOpts.RequestID) != "" {
+		return fmt.Errorf("use only one of --no-wait or --request-id")
+	}
+	if loginOpts.NoWait && usesLegacyPasswordLogin(loginOpts) {
+		return fmt.Errorf("--no-wait is only supported with browser authorization; do not combine it with --email, --password-stdin, or --turnstile-response")
+	}
+	if strings.TrimSpace(loginOpts.RequestID) != "" && usesLegacyPasswordLogin(loginOpts) {
+		return fmt.Errorf("--request-id is only supported with browser authorization; do not combine it with --email, --password-stdin, or --turnstile-response")
+	}
+	if strings.TrimSpace(loginOpts.RequestID) != "" && loginOpts.ExpiresIn > 0 {
+		return fmt.Errorf("--expires-in is only supported with --email/--password-stdin legacy login; it cannot be used with --request-id")
+	}
+	return nil
+}
+
 func authorizeAndStoreAPIKey(cmd *cobra.Command, opts *globalOptions, rt *runtimeContext, loginOpts loginCredentialOptions) error {
 	deviceUUID, err := ensureRuntimeDeviceUUID(rt)
 	if err != nil {
@@ -389,6 +481,14 @@ func authorizeAndStoreAPIKey(cmd *cobra.Command, opts *globalOptions, rt *runtim
 	if strings.TrimSpace(createResp.PollToken) == "" {
 		return fmt.Errorf("authorization response did not include poll_token")
 	}
+	if loginOpts.NoWait {
+		pending := pendingFromCreateResponse(rt, deviceUUID, deviceName, createResp)
+		if err := savePendingAuthorization(pending); err != nil {
+			return err
+		}
+		writeNoWaitAuthorizationInstructions(cmd, createResp.AuthorizationURL, createResp.AuthorizationID)
+		return writePendingAuthorizationResult(rt, pending)
+	}
 	writeAuthorizationInstructions(cmd, createResp.AuthorizationURL, loginOpts.NoBrowser)
 	if !loginOpts.NoBrowser {
 		if err := openBrowser(cmd, createResp.AuthorizationURL); err != nil {
@@ -420,6 +520,83 @@ func authorizeAndStoreAPIKey(cmd *cobra.Command, opts *globalOptions, rt *runtim
 		},
 		"device": map[string]any{
 			"name": deviceName,
+		},
+		"stored": true,
+	}
+	if loginOpts.Check {
+		check := attemptStoredCredentialCheck(cmd, opts, stored.Profile, resultResp.APIKey)
+		result["check"] = check
+		result["verified"] = checkOK(check)
+	}
+	return writeResult(rt, result, nil)
+}
+
+func writePendingAuthorizationResult(rt *runtimeContext, pending pendingAuthorization) error {
+	result := map[string]any{
+		"profile":      rt.ProfileName,
+		"endpoint":     rt.Profile.Endpoint,
+		"workspace_id": rt.Profile.WorkspaceID,
+		"auth_method":  "api_key_authorization",
+		"authorization": map[string]any{
+			"id":                pending.AuthorizationID,
+			"status":            "pending",
+			"authorization_url": pending.AuthorizationURL,
+			"expires_at":        pending.ExpiresAt,
+		},
+		"device": map[string]any{
+			"name": pending.DeviceName,
+		},
+		"pending_store":   mustPendingAuthorizationsPath(),
+		"stored":          false,
+		"resume_command":  "tmc auth login --request-id " + pending.AuthorizationID,
+		"setup_resume":    "tmc setup --request-id " + pending.AuthorizationID,
+		"check_deferred":  true,
+		"open_in_browser": pending.AuthorizationURL,
+	}
+	return writeResult(rt, result, nil)
+}
+
+func resumeAndStoreAPIKeyAuthorization(cmd *cobra.Command, opts *globalOptions, rt *runtimeContext, loginOpts loginCredentialOptions) error {
+	requestID := strings.TrimSpace(loginOpts.RequestID)
+	if opts.requestOut != "" {
+		plan := buildResumeAuthorizationPlan(rt, loginOpts)
+		if err := writeJSONPlan(opts.requestOut, plan); err != nil {
+			return err
+		}
+	}
+	pending, err := loadPendingAuthorization(requestID)
+	if err != nil {
+		return err
+	}
+	if err := validatePendingAuthorizationForRuntime(pending, rt); err != nil {
+		return err
+	}
+	auth := createResponseFromPending(pending)
+	pollClient := newFlowClient(rt.Profile, pending.PollToken, cmd.CommandPath(), opts)
+	resultResp, err := pollAPIKeyAuthorizationResult(cmd, pollClient, auth)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(resultResp.APIKey) == "" {
+		return fmt.Errorf("authorization result did not include api_key")
+	}
+	stored, err := storeAPIKeyForRuntime(rt, resultResp.APIKey)
+	if err != nil {
+		return err
+	}
+	if err := removePendingAuthorization(requestID); err != nil {
+		return err
+	}
+	result := map[string]any{
+		"profile":          stored.ProfileName,
+		"endpoint":         stored.Profile.Endpoint,
+		"workspace_id":     stored.Profile.WorkspaceID,
+		"auth_method":      "api_key_authorization",
+		"credential_store": mustCredentialsPath(),
+		"config_path":      mustConfigPath(),
+		"authorization": map[string]any{
+			"id":     requestID,
+			"status": resultResp.Status,
 		},
 		"stored": true,
 	}
@@ -646,6 +823,18 @@ func writeAuthorizationInstructions(cmd *cobra.Command, authorizationURL string,
 		fmt.Fprintln(cmd.ErrOrStderr(), "Opening browser for TMCopilot CLI authorization.")
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for authorization...")
+}
+
+func writeNoWaitAuthorizationInstructions(cmd *cobra.Command, authorizationURL string, requestID string) {
+	fmt.Fprintf(cmd.ErrOrStderr(), "Open this URL to authorize the CLI:\n%s\n", authorizationURL)
+	fmt.Fprintf(cmd.ErrOrStderr(), "After approval, resume with:\n%s\n", noWaitResumeCommand(cmd, requestID))
+}
+
+func noWaitResumeCommand(cmd *cobra.Command, requestID string) string {
+	if cmd != nil && strings.HasSuffix(cmd.CommandPath(), " setup") {
+		return "tmc setup --request-id " + requestID
+	}
+	return "tmc auth login --request-id " + requestID
 }
 
 func openBrowser(cmd *cobra.Command, rawURL string) error {

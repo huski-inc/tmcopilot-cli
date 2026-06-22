@@ -17,7 +17,7 @@ Install · Quick Start · Authentication · Features · Agent Skills · Output &
 ## Why tmc?
 
 - Ready to use: install the native binary with one `npx` command on macOS, Linux, or Windows
-- Browser authorization: `tmc setup` opens the authorization page and stores a CLI API key after approval
+- Browser authorization: `tmc setup` opens the authorization page and stores a CLI API key after approval; agents can use `--no-wait` and resume later
 - Agent friendly: built-in `skills` docs help agents learn conventions before choosing commands
 - Structured output: JSON by default, with `pretty`, `raw`, `ndjson`, and `csv` for people and programs
 - Large exports: paginated commands support `--page-all`, field selection, file output, and manifests
@@ -117,26 +117,34 @@ npx @tmcopilot/cli@latest install
 Step 2: read the shared conventions.
 
 ```bash
+tmc agent bootstrap
 tmc skills list
 tmc skills read tmc-shared
 ```
 
-Step 3: start browser authorization without opening a browser from the agent environment.
+Step 3: create a non-blocking browser authorization request.
 
 ```bash
-tmc setup --no-browser
+tmc setup --no-wait
 ```
 
-The agent should send the printed authorization URL to the user. The user completes login and approval in the browser while the command keeps waiting for the result.
+The command prints an authorization URL and a request ID, stores the local polling token under `~/.tmcopilot`, and exits. The raw API key and poll token are not printed.
 
-Step 4: verify access.
+Step 4: ask the user to open the authorization URL and approve access, then resume the request.
 
 ```bash
+tmc setup --request-id <request_id>
+```
+
+Step 5: verify access.
+
+```bash
+tmc agent bootstrap --check
 tmc auth status --check
 tmc auth workspaces
 ```
 
-Step 5: read the domain skill for the task.
+Step 6: read the domain skill for the task.
 
 ```bash
 tmc skills read tmc-trademark-search
@@ -150,7 +158,11 @@ tmc skills read tmc-gap-analysis
 | --- | --- |
 | `tmc setup` | Recommended entry point. Authorizes in the browser and stores a local API key |
 | `tmc setup --no-browser` | Prints the authorization URL instead of opening a browser |
+| `tmc setup --no-wait` | Creates an authorization request, prints the URL and request ID, stores the local polling token, and exits |
+| `tmc setup --request-id <request_id>` | Resumes a pending `--no-wait` authorization after the user approves access |
 | `tmc auth login` | Same browser authorization flow, useful for reauthorizing the active profile |
+| `tmc auth login --no-wait` | Non-blocking authorization flow for agent environments |
+| `tmc auth login --request-id <request_id>` | Resume a pending non-blocking authorization request |
 | `tmc auth status --check` | Shows local auth state and verifies credentials with `/auth/me` |
 | `tmc auth whoami` | Shows the current authenticated user |
 | `tmc auth workspaces` | Lists accessible workspaces |
@@ -260,6 +272,12 @@ tmc api endpoint GET /auth/me
 tmc api schema POST /trademark/search
 ```
 
+`tmc schema <command...>` includes agent-oriented metadata:
+
+- `safety`: whether the command is read-only, has side effects, is destructive, supports `--dry-run`, or requires `--yes`
+- `pagination`: whether `--page-all`, `--fields`, and `--manifest` are supported
+- `examples`: command-specific next commands to inspect or dry-run
+
 ### 3. Raw API
 
 When a backend endpoint exists but a typed command has not been added yet, call the REST API directly:
@@ -345,11 +363,14 @@ The CLI embeds agent-readable usage guidance. Agents should read `tmc-shared` fi
 | `tmc-openapi` | API catalog, schema, and raw API usage |
 
 ```bash
+tmc agent bootstrap
 tmc skills list
 tmc skills read tmc-shared
 tmc skills read tmc-trademark-search
 tmc skills read tmc-openapi/references/catalog.md --json
 ```
+
+`tmc agent bootstrap --check` returns one machine-readable snapshot with command aliases, auth status, configured endpoint, available skills, discovery commands, safety guidance, and recommended next steps. Use it as the first command when an AI agent is unsure how the local CLI is configured.
 
 ## Configuration And Profiles
 
@@ -379,7 +400,7 @@ tmc --timeout 60s <command>
 `tmc` can read and operate on data that your TMCopilot account can access. When using it with an AI agent, keep these risks in mind:
 
 - The agent may misunderstand your intent and run the wrong query or write operation
-- Do not paste API keys, authorization URLs, or sensitive export files into untrusted environments
+- Do not paste API keys, authorization URLs, local pending authorization files, or sensitive export files into untrusted environments
 - Use `--dry-run --request-out request.json` before write operations to inspect the request
 - Delete and revoke operations require `--yes`
 - On shared machines, run `tmc auth logout` when you are done
@@ -420,5 +441,6 @@ Use a temporary config directory when testing against a local backend:
 
 ```bash
 export TMCOPILOT_HOME="$(mktemp -d)"
-go run . --endpoint http://localhost:8080 setup --no-browser
+go run . --endpoint http://localhost:8080 setup --no-wait
+go run . --endpoint http://localhost:8080 setup --request-id <request_id>
 ```

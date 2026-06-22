@@ -25,16 +25,39 @@ type commandSchema struct {
 	GlobalFlags   []flagSchema            `json:"global_flags,omitempty"`
 	Endpoint      *openapi.Endpoint       `json:"endpoint,omitempty"`
 	OpenAPI       *openapi.EndpointSchema `json:"openapi,omitempty"`
+	Safety        *commandSafety          `json:"safety,omitempty"`
+	Pagination    *commandPagination      `json:"pagination,omitempty"`
+	Examples      []string                `json:"examples,omitempty"`
 	Children      []commandListItem       `json:"children,omitempty"`
 	SchemaCommand string                  `json:"schema_command,omitempty"`
 }
 
 type commandListItem struct {
-	Command       string            `json:"command"`
-	Aliases       []string          `json:"aliases,omitempty"`
-	Short         string            `json:"short,omitempty"`
-	Endpoint      *openapi.Endpoint `json:"endpoint,omitempty"`
-	SchemaCommand string            `json:"schema_command,omitempty"`
+	Command       string             `json:"command"`
+	Aliases       []string           `json:"aliases,omitempty"`
+	Short         string             `json:"short,omitempty"`
+	Endpoint      *openapi.Endpoint  `json:"endpoint,omitempty"`
+	Safety        *commandSafety     `json:"safety,omitempty"`
+	Pagination    *commandPagination `json:"pagination,omitempty"`
+	SchemaCommand string             `json:"schema_command,omitempty"`
+}
+
+type commandSafety struct {
+	AuthRequired   bool   `json:"auth_required"`
+	ReadOnly       bool   `json:"read_only"`
+	SideEffect     bool   `json:"side_effect"`
+	Destructive    bool   `json:"destructive"`
+	SupportsDryRun bool   `json:"supports_dry_run"`
+	RequiresYes    bool   `json:"requires_yes"`
+	Hint           string `json:"hint,omitempty"`
+}
+
+type commandPagination struct {
+	SupportsPageAll   bool     `json:"supports_page_all"`
+	SupportsFields    bool     `json:"supports_fields"`
+	SupportsManifest  bool     `json:"supports_manifest"`
+	RecommendedFormat string   `json:"recommended_format,omitempty"`
+	Flags             []string `json:"flags,omitempty"`
 }
 
 type flagSchema struct {
@@ -144,11 +167,14 @@ func buildCommandSchema(cmd *cobra.Command, includeOpenAPI bool) commandSchema {
 		if schema, err := endpointSchemaFor(spec.Method, spec.Path); err == nil {
 			endpoint := schema.Endpoint
 			result.Endpoint = &endpoint
+			result.Safety = commandSafetyFor(key, spec)
 			if includeOpenAPI {
 				result.OpenAPI = &schema
 			}
 		}
 	}
+	result.Pagination = commandPaginationFor(cmd)
+	result.Examples = commandExamplesFor(cmd, key, result.Safety, result.Pagination)
 	return result
 }
 
@@ -171,6 +197,8 @@ func listMappedCommandSchemas(root *cobra.Command, prefix string) []commandListI
 		if endpoint, ok := openapi.FindEndpoint(spec.Method, spec.Path); ok {
 			item.Endpoint = &endpoint
 		}
+		item.Safety = commandSafetyFor(key, spec)
+		item.Pagination = commandPaginationFor(cmd)
 		items = append(items, item)
 	}
 	sortCommandList(items)
@@ -281,6 +309,111 @@ func isHTTPMethodArg(value string) bool {
 	default:
 		return false
 	}
+}
+
+func commandSafetyFor(key string, spec commandEndpointSpec) *commandSafety {
+	method := strings.ToUpper(strings.TrimSpace(spec.Method))
+	destructive := isDestructiveRequest(method, spec.Path)
+	sideEffect := destructive || isWriteMethod(method) && !isReadLikeCommand(key, spec)
+	hint := "safe to run after checking required flags"
+	if sideEffect {
+		hint = "use --dry-run --request-out before running when the user has not confirmed inputs"
+	}
+	if destructive {
+		hint = "requires --yes unless using --dry-run"
+	}
+	return &commandSafety{
+		AuthRequired:   true,
+		ReadOnly:       !sideEffect,
+		SideEffect:     sideEffect,
+		Destructive:    destructive,
+		SupportsDryRun: true,
+		RequiresYes:    destructive,
+		Hint:           hint,
+	}
+}
+
+func isWriteMethod(method string) bool {
+	switch strings.ToUpper(strings.TrimSpace(method)) {
+	case "POST", "PUT", "PATCH", "DELETE":
+		return true
+	default:
+		return false
+	}
+}
+
+func isReadLikeCommand(key string, spec commandEndpointSpec) bool {
+	method := strings.ToUpper(strings.TrimSpace(spec.Method))
+	if method == "GET" {
+		return true
+	}
+	if method != "POST" {
+		return false
+	}
+	key = strings.TrimSpace(key)
+	if strings.HasPrefix(key, "search ") {
+		return true
+	}
+	switch spec.Path {
+	case "/trademark/detail", "/trademark/search", "/trademark/search/summary", "/trademark/office-action/search", "/trademark/ttab/search":
+		return true
+	default:
+		return false
+	}
+}
+
+func commandPaginationFor(cmd *cobra.Command) *commandPagination {
+	if cmd == nil {
+		return nil
+	}
+	flags := cmd.Flags()
+	if flags == nil || flags.Lookup("page-all") == nil {
+		return nil
+	}
+	out := &commandPagination{
+		SupportsPageAll:   true,
+		RecommendedFormat: "ndjson",
+	}
+	if flags.Lookup("fields") != nil {
+		out.SupportsFields = true
+		out.Flags = append(out.Flags, "--fields")
+	}
+	if flags.Lookup("manifest") != nil {
+		out.SupportsManifest = true
+		out.Flags = append(out.Flags, "--manifest")
+	}
+	for _, name := range []string{"--page", "--page-size", "--page-all", "--max-pages", "--max-rows", "--progress"} {
+		if flags.Lookup(strings.TrimPrefix(name, "--")) != nil {
+			out.Flags = append(out.Flags, name)
+		}
+	}
+	sort.Strings(out.Flags)
+	return out
+}
+
+func commandExamplesFor(cmd *cobra.Command, key string, safety *commandSafety, pagination *commandPagination) []string {
+	examples := []string{}
+	if strings.TrimSpace(key) != "" {
+		examples = append(examples, "tmc "+key+" --help")
+	}
+	if safety != nil && safety.SupportsDryRun && safety.SideEffect {
+		examples = append(examples, "tmc --dry-run --request-out request.json "+strings.TrimPrefix(commandUseLine(cmd, key), "tmc "))
+	}
+	if pagination != nil && pagination.SupportsPageAll {
+		examples = append(examples, "tmc "+key+" --page-all --format ndjson --output export.ndjson --manifest export.manifest.json")
+	}
+	return examples
+}
+
+func commandUseLine(cmd *cobra.Command, key string) string {
+	if cmd == nil {
+		return "tmc " + key
+	}
+	line := strings.TrimSpace(cmd.UseLine())
+	if line == "" {
+		return "tmc " + key
+	}
+	return line
 }
 
 var commandEndpointSpecs = map[string]commandEndpointSpec{

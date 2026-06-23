@@ -263,6 +263,15 @@ tmc domain max-similarity --keyword nike
 ```bash
 tmc portfolio trademarks list --keyword nike --country US --class 25
 tmc portfolio trademarks get <trademark-id>
+tmc portfolio trademarks import-preview --owner-name Nike --country US
+tmc portfolio trademarks import --owner-name Nike --country US
+tmc portfolio trademarks update <trademark-id> --text "NIKE" --status 10
+tmc portfolio trademarks metadata get <trademark-id>
+tmc portfolio trademarks metadata update <trademark-id> --owner-name "Nike Inc." --nice-class 25,35
+tmc portfolio trademarks monitor update <trademark-id> --office-action-enable=true --conflict-action-enable=false
+tmc portfolio trademarks monitor batch-toggle --trademark-id <id1>,<id2> --monitor-type conflict --enable=true --conflict-mode text
+tmc portfolio groups list --keyword nike
+tmc portfolio groups monitor-toggle <group-id> --monitor-type office_action --enable=true
 tmc portfolio monitored-summary
 tmc portfolio counts
 tmc portfolio actions office --keyword nike --status 1

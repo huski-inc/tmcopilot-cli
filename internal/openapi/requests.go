@@ -215,3 +215,123 @@ func (r ImageSearchTaskRequest) Empty() bool {
 type ImageSearchTaskResultRequest struct {
 	ID string `json:"id,omitempty"`
 }
+
+type PortfolioImportTrademarksRequest struct {
+	Country           string   `json:"country,omitempty"`
+	LawyerNames       []string `json:"lawyer_names,omitempty"`
+	OrganizationNames []string `json:"organization_names,omitempty"`
+	OwnerNames        []string `json:"owner_names,omitempty"`
+}
+
+func (r PortfolioImportTrademarksRequest) Empty() bool {
+	return r.Country == "" &&
+		len(r.LawyerNames) == 0 &&
+		len(r.OrganizationNames) == 0 &&
+		len(r.OwnerNames) == 0
+}
+
+func (r PortfolioImportTrademarksRequest) HasImportCriteria() bool {
+	return len(r.LawyerNames) > 0 || len(r.OrganizationNames) > 0 || len(r.OwnerNames) > 0
+}
+
+type PortfolioUpdateTrademarkRequest struct {
+	AttorneyDocketNumber string `json:"attorney_docket_number,omitempty"`
+	Country              string `json:"country,omitempty"`
+	Format               *int   `json:"format,omitempty"`
+	Status               *int   `json:"status,omitempty"`
+	Text                 string `json:"text,omitempty"`
+}
+
+func (r PortfolioUpdateTrademarkRequest) Empty() bool {
+	return r.AttorneyDocketNumber == "" &&
+		r.Country == "" &&
+		r.Format == nil &&
+		r.Status == nil &&
+		r.Text == ""
+}
+
+type PortfolioTrademarkMetadataRequest struct {
+	AttorneyName       string   `json:"attorney_name,omitempty"`
+	CBPStatus          string   `json:"cbp_status,omitempty"`
+	CustomReminderDate string   `json:"custom_reminder_date,omitempty"`
+	ExpiryDate         string   `json:"expiry_date,omitempty"`
+	FilingDate         string   `json:"filing_date,omitempty"`
+	GoodsServices      string   `json:"goods_services,omitempty"`
+	MadridIRN          string   `json:"madrid_irn,omitempty"`
+	MarkImageURL       string   `json:"mark_image_url,omitempty"`
+	NextEventDate      string   `json:"next_event_date,omitempty"`
+	NextEventType      string   `json:"next_event_type,omitempty"`
+	NiceClasses        []int    `json:"nice_classes,omitempty"`
+	OwnerName          string   `json:"owner_name,omitempty"`
+	RegistrationDate   string   `json:"registration_date,omitempty"`
+	RegistrationNumber string   `json:"registration_number,omitempty"`
+	ReminderIntervals  []string `json:"reminder_intervals,omitempty"`
+}
+
+func (r PortfolioTrademarkMetadataRequest) Empty() bool {
+	return r.AttorneyName == "" &&
+		r.CBPStatus == "" &&
+		r.CustomReminderDate == "" &&
+		r.ExpiryDate == "" &&
+		r.FilingDate == "" &&
+		r.GoodsServices == "" &&
+		r.MadridIRN == "" &&
+		r.MarkImageURL == "" &&
+		r.NextEventDate == "" &&
+		r.NextEventType == "" &&
+		len(r.NiceClasses) == 0 &&
+		r.OwnerName == "" &&
+		r.RegistrationDate == "" &&
+		r.RegistrationNumber == "" &&
+		len(r.ReminderIntervals) == 0
+}
+
+type PortfolioMonitorConfig struct {
+	CBPActionEnable            *bool `json:"cbp_action_enable,omitempty"`
+	ConflictActionEnable       *bool `json:"conflict_action_enable,omitempty"`
+	ConflictImageEnable        *bool `json:"conflict_image_enable,omitempty"`
+	ConflictNotifyAssigned     *bool `json:"conflict_notify_assigned,omitempty"`
+	ConflictNotifyClient       *bool `json:"conflict_notify_client,omitempty"`
+	ConflictNotifyMe           *bool `json:"conflict_notify_me,omitempty"`
+	ConflictTextEnable         *bool `json:"conflict_text_enable,omitempty"`
+	OfficeActionEnable         *bool `json:"office_action_enable,omitempty"`
+	OfficeActionNotifyAssigned *bool `json:"office_action_notify_assigned,omitempty"`
+	OfficeActionNotifyClient   *bool `json:"office_action_notify_client,omitempty"`
+	OfficeActionNotifyMe       *bool `json:"office_action_notify_me,omitempty"`
+}
+
+func (r PortfolioMonitorConfig) Empty() bool {
+	return r.CBPActionEnable == nil &&
+		r.ConflictActionEnable == nil &&
+		r.ConflictImageEnable == nil &&
+		r.ConflictNotifyAssigned == nil &&
+		r.ConflictNotifyClient == nil &&
+		r.ConflictNotifyMe == nil &&
+		r.ConflictTextEnable == nil &&
+		r.OfficeActionEnable == nil &&
+		r.OfficeActionNotifyAssigned == nil &&
+		r.OfficeActionNotifyClient == nil &&
+		r.OfficeActionNotifyMe == nil
+}
+
+type PortfolioUpdateMonitorConfigRequest struct {
+	Config PortfolioMonitorConfig `json:"config"`
+}
+
+type PortfolioBatchUpdateMonitorConfigRequest struct {
+	Config       PortfolioMonitorConfig `json:"config"`
+	TrademarkIDs []string               `json:"trademark_ids,omitempty"`
+}
+
+type PortfolioBatchToggleMonitorConfigRequest struct {
+	TrademarkIDs []string `json:"trademark_ids,omitempty"`
+	MonitorType  string   `json:"monitor_type,omitempty"`
+	Enable       *bool    `json:"enable,omitempty"`
+	ConflictMode string   `json:"conflict_mode,omitempty"`
+}
+
+type PortfolioGroupToggleMonitorConfigRequest struct {
+	MonitorType  string `json:"monitor_type,omitempty"`
+	Enable       *bool  `json:"enable,omitempty"`
+	ConflictMode string `json:"conflict_mode,omitempty"`
+}

@@ -98,26 +98,26 @@
 | typed | GET | `/portfolio/tasks/latest-sync` | portfolio-task | Get latest portfolio task sync |
 | typed | GET | `/portfolio/tasks/stats` | portfolio-task | Get portfolio task stats |
 | typed | GET | `/portfolio/tasks/{taskId}` | portfolio-task | Get portfolio worker task |
-| raw | GET | `/portfolio/trademark-groups` | portfolio-trademark | List trademark groups |
-| raw | PUT | `/portfolio/trademark-groups/{groupId}/monitor/toggle` | portfolio-trademark | Toggle trademark group monitor type |
-| raw | PUT | `/portfolio/trademark-monitor` | portfolio-trademark | Batch update monitor config |
-| raw | PUT | `/portfolio/trademark-monitor/toggle` | portfolio-trademark | Batch toggle trademark monitor type |
+| typed | GET | `/portfolio/trademark-groups` | portfolio-trademark | List trademark groups |
+| typed | PUT | `/portfolio/trademark-groups/{groupId}/monitor/toggle` | portfolio-trademark | Toggle trademark group monitor type |
+| typed | PUT | `/portfolio/trademark-monitor` | portfolio-trademark | Batch update monitor config |
+| typed | PUT | `/portfolio/trademark-monitor/toggle` | portfolio-trademark | Batch toggle trademark monitor type |
 | raw | DELETE | `/portfolio/trademarks` | portfolio-trademark | Delete portfolio trademarks |
 | raw | GET | `/portfolio/trademarks` | portfolio-trademark | List portfolio trademarks |
 | raw | POST | `/portfolio/trademarks` | portfolio-trademark | Batch create portfolio trademarks |
 | typed | GET | `/portfolio/trademarks/counts` | portfolio-trademark | Get trademark counts |
-| raw | POST | `/portfolio/trademarks/import` | portfolio-trademark | Import trademarks by lawyer/owner names |
-| raw | POST | `/portfolio/trademarks/import/preview` | portfolio-trademark | Preview portfolio trademark import |
+| typed | POST | `/portfolio/trademarks/import` | portfolio-trademark | Import trademarks by lawyer/owner names |
+| typed | POST | `/portfolio/trademarks/import/preview` | portfolio-trademark | Preview portfolio trademark import |
 | typed | GET | `/portfolio/trademarks/monitored` | portfolio-trademark | List monitored trademarks |
 | typed | GET | `/portfolio/trademarks/search` | portfolio-trademark | Search portfolio trademarks |
 | typed | GET | `/portfolio/trademarks/{trademarkId}` | portfolio-trademark | Get a portfolio trademark |
-| raw | PUT | `/portfolio/trademarks/{trademarkId}` | portfolio-trademark | Update a portfolio trademark |
+| typed | PUT | `/portfolio/trademarks/{trademarkId}` | portfolio-trademark | Update a portfolio trademark |
 | raw | GET | `/portfolio/trademarks/{trademarkId}/conflict-actions` | portfolio-action | List conflict actions by trademark |
 | raw | GET | `/portfolio/trademarks/{trademarkId}/conflict-actions/{id}` | portfolio-action | Get a conflict action |
 | raw | PUT | `/portfolio/trademarks/{trademarkId}/conflict-actions/{id}/status` | portfolio-action | Update conflict action status |
-| raw | GET | `/portfolio/trademarks/{trademarkId}/metadata` | portfolio-trademark | Get manual portfolio trademark metadata |
-| raw | PUT | `/portfolio/trademarks/{trademarkId}/metadata` | portfolio-trademark | Update manual portfolio trademark metadata |
-| raw | PUT | `/portfolio/trademarks/{trademarkId}/monitor` | portfolio-trademark | Update trademark monitor config |
+| typed | GET | `/portfolio/trademarks/{trademarkId}/metadata` | portfolio-trademark | Get manual portfolio trademark metadata |
+| typed | PUT | `/portfolio/trademarks/{trademarkId}/metadata` | portfolio-trademark | Update manual portfolio trademark metadata |
+| typed | PUT | `/portfolio/trademarks/{trademarkId}/monitor` | portfolio-trademark | Update trademark monitor config |
 | raw | GET | `/portfolio/trademarks/{trademarkId}/office-actions` | portfolio-action | List office actions by trademark |
 | raw | GET | `/portfolio/trademarks/{trademarkId}/office-actions/{id}` | portfolio-action | Get an office action |
 | raw | PUT | `/portfolio/trademarks/{trademarkId}/office-actions/{id}/status` | portfolio-action | Update office action status |

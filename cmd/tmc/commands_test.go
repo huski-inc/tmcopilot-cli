@@ -1022,6 +1022,225 @@ func TestPathArgumentsAreEscaped(t *testing.T) {
 	}
 }
 
+func TestPortfolioImportBuildsOpenAPIRequest(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/portfolio/trademarks/import" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"trademarks_imported":2}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"portfolio", "trademarks", "import",
+		"--owner-name", "Nike,Adidas",
+		"--organization-name", "Nike Inc.",
+		"--lawyer-name", "Smith",
+		"--country", "US",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	if !reflect.DeepEqual(gotBody["owner_names"], []any{"Nike", "Adidas"}) {
+		t.Fatalf("owner names mismatch: %#v", gotBody["owner_names"])
+	}
+	if !reflect.DeepEqual(gotBody["organization_names"], []any{"Nike Inc."}) {
+		t.Fatalf("organization names mismatch: %#v", gotBody["organization_names"])
+	}
+	if !reflect.DeepEqual(gotBody["lawyer_names"], []any{"Smith"}) || gotBody["country"] != "US" {
+		t.Fatalf("body mismatch: %#v", gotBody)
+	}
+}
+
+func TestPortfolioTrademarkUpdateBuildsOpenAPIRequest(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/portfolio/trademarks/123" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"ok":true}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"portfolio", "trademarks", "update", "123",
+		"--text", "NIKE",
+		"--country", "US",
+		"--trademark-format", "1",
+		"--status", "10",
+		"--attorney-docket-number", "ADN-001",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	if gotBody["text"] != "NIKE" || gotBody["country"] != "US" || gotBody["attorney_docket_number"] != "ADN-001" {
+		t.Fatalf("body mismatch: %#v", gotBody)
+	}
+	if gotBody["format"] != float64(1) || gotBody["status"] != float64(10) {
+		t.Fatalf("integer body mismatch: %#v", gotBody)
+	}
+}
+
+func TestPortfolioTrademarkMetadataUpdateBuildsOpenAPIRequest(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/portfolio/trademarks/123/metadata" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"trademark_id":123}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"portfolio", "trademarks", "metadata", "update", "123",
+		"--owner-name", "Nike Inc.",
+		"--attorney-name", "Sarah Chen",
+		"--nice-class", "25,35",
+		"--reminder-interval", "2_months,1_month",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	if gotBody["owner_name"] != "Nike Inc." || gotBody["attorney_name"] != "Sarah Chen" {
+		t.Fatalf("body mismatch: %#v", gotBody)
+	}
+	if !reflect.DeepEqual(gotBody["nice_classes"], []any{float64(25), float64(35)}) {
+		t.Fatalf("nice classes mismatch: %#v", gotBody["nice_classes"])
+	}
+	if !reflect.DeepEqual(gotBody["reminder_intervals"], []any{"2_months", "1_month"}) {
+		t.Fatalf("reminder intervals mismatch: %#v", gotBody["reminder_intervals"])
+	}
+}
+
+func TestPortfolioMonitorCommandsBuildOpenAPIRequests(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantPath string
+		wantBody func(t *testing.T, body map[string]any)
+	}{
+		{
+			name:     "single update",
+			args:     []string{"portfolio", "trademarks", "monitor", "update", "123", "--office-action-enable=true", "--conflict-action-enable=false"},
+			wantPath: "/api/v1/portfolio/trademarks/123/monitor",
+			wantBody: func(t *testing.T, body map[string]any) {
+				config, ok := body["config"].(map[string]any)
+				if !ok {
+					t.Fatalf("config missing: %#v", body)
+				}
+				if config["office_action_enable"] != true || config["conflict_action_enable"] != false {
+					t.Fatalf("config mismatch: %#v", config)
+				}
+			},
+		},
+		{
+			name:     "batch toggle",
+			args:     []string{"portfolio", "trademarks", "monitor", "batch-toggle", "--trademark-id", "123,456", "--monitor-type", "conflict", "--enable=false", "--conflict-mode", "text"},
+			wantPath: "/api/v1/portfolio/trademark-monitor/toggle",
+			wantBody: func(t *testing.T, body map[string]any) {
+				if !reflect.DeepEqual(body["trademark_ids"], []any{"123", "456"}) {
+					t.Fatalf("ids mismatch: %#v", body["trademark_ids"])
+				}
+				if body["monitor_type"] != "conflict" || body["enable"] != false || body["conflict_mode"] != "text" {
+					t.Fatalf("body mismatch: %#v", body)
+				}
+			},
+		},
+		{
+			name:     "group toggle",
+			args:     []string{"portfolio", "groups", "monitor-toggle", "group/1", "--monitor-type", "office_action", "--enable=true"},
+			wantPath: "/api/v1/portfolio/trademark-groups/group%2F1/monitor/toggle",
+			wantBody: func(t *testing.T, body map[string]any) {
+				if body["monitor_type"] != "office_action" || body["enable"] != true {
+					t.Fatalf("body mismatch: %#v", body)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotPath string
+			var gotBody map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPut {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				gotPath = r.URL.EscapedPath()
+				if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+					t.Fatalf("decode request body: %v", err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"ok":true}}`))
+			}))
+			defer server.Close()
+
+			t.Setenv("TMCOPILOT_HOME", t.TempDir())
+			t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+			cmd := NewRootCommand()
+			var stdout, stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+			}
+			if gotPath != tt.wantPath {
+				t.Fatalf("path = %q, want %q", gotPath, tt.wantPath)
+			}
+			tt.wantBody(t, gotBody)
+		})
+	}
+}
+
 func TestDryRunDoesNotCallAPIAndWritesRequestOut(t *testing.T) {
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1213,6 +1432,56 @@ func TestSchemaIncludesPaginationMetadata(t *testing.T) {
 	}
 	if schema.Data.Pagination.RecommendedFormat != "ndjson" {
 		t.Fatalf("recommended format = %q", schema.Data.Pagination.RecommendedFormat)
+	}
+}
+
+func TestPortfolioMutationSchemasExposeTypedSafety(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "portfolio", "trademarks", "import"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var schema struct {
+		Data struct {
+			Endpoint struct {
+				Coverage string `json:"coverage"`
+				Path     string `json:"path"`
+			} `json:"endpoint"`
+			Safety struct {
+				ReadOnly   bool `json:"read_only"`
+				SideEffect bool `json:"side_effect"`
+			} `json:"safety"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &schema); err != nil {
+		t.Fatalf("decode schema: %v output=%s", err, stdout.String())
+	}
+	if schema.Data.Endpoint.Path != "/portfolio/trademarks/import" || schema.Data.Endpoint.Coverage != "typed" {
+		t.Fatalf("endpoint metadata mismatch: %#v", schema.Data.Endpoint)
+	}
+	if schema.Data.Safety.ReadOnly || !schema.Data.Safety.SideEffect {
+		t.Fatalf("import safety mismatch: %#v", schema.Data.Safety)
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "portfolio", "trademarks", "import-preview"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("preview schema failed: %v stderr=%s", err, stderr.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &schema); err != nil {
+		t.Fatalf("decode preview schema: %v output=%s", err, stdout.String())
+	}
+	if !schema.Data.Safety.ReadOnly || schema.Data.Safety.SideEffect {
+		t.Fatalf("preview safety mismatch: %#v", schema.Data.Safety)
 	}
 }
 

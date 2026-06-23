@@ -83,6 +83,12 @@ tmc --endpoint http://localhost:8080 portfolio trademarks list \
 ```
 
 ```bash
+tmc --dry-run --request-out request.json portfolio trademarks import --owner-name Nike --country US
+tmc portfolio trademarks metadata update <trademark-id> --owner-name "Nike Inc." --nice-class 25,35
+tmc portfolio trademarks monitor batch-toggle --trademark-id <id1>,<id2> --monitor-type conflict --enable=true
+```
+
+```bash
 tmc search trademarks --name Nike --limit 20 --output search.json
 ```
 

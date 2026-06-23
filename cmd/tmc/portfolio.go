@@ -19,7 +19,20 @@ func newPortfolioCommand(opts *globalOptions) *cobra.Command {
 	trademarks.AddCommand(newPortfolioTrademarksListCommand(opts))
 	trademarks.AddCommand(newPortfolioTrademarkGetCommand(opts))
 	trademarks.AddCommand(newPortfolioMonitoredTrademarksCommand(opts))
+	trademarks.AddCommand(newPortfolioTrademarksImportCommand(opts))
+	trademarks.AddCommand(newPortfolioTrademarksImportPreviewCommand(opts))
+	trademarks.AddCommand(newPortfolioTrademarkUpdateCommand(opts))
+	trademarks.AddCommand(newPortfolioTrademarkMetadataCommand(opts))
+	trademarks.AddCommand(newPortfolioTrademarkMonitorCommand(opts))
 	cmd.AddCommand(trademarks)
+
+	groups := &cobra.Command{
+		Use:   "groups",
+		Short: "Work with portfolio trademark groups",
+	}
+	groups.AddCommand(newPortfolioTrademarkGroupsListCommand(opts))
+	groups.AddCommand(newPortfolioTrademarkGroupMonitorToggleCommand(opts))
+	cmd.AddCommand(groups)
 
 	actions := &cobra.Command{
 		Use:   "actions",

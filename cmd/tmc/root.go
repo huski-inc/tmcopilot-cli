@@ -73,13 +73,15 @@ func Execute(args []string, in io.Reader, out io.Writer, errOut io.Writer) int {
 	if errOut != nil {
 		cmd.SetErr(errOut)
 	}
-	if err := cmd.Execute(); err != nil {
+	executedCmd, err := cmd.ExecuteC()
+	if err != nil {
 		var reported reportedError
 		if !errors.As(err, &reported) {
 			output.WriteFailure(cmd.ErrOrStderr(), classifyCommandFailure(cmd, args, err))
 		}
 		return exitCodeFor(err)
 	}
+	maybeRunAutomaticUpdateCheck(executedCmd)
 	return 0
 }
 
@@ -135,6 +137,7 @@ DISCOVERY:
 	root.PersistentFlags().StringVar(&opts.idempotencyKey, "idempotency-key", "", "send Idempotency-Key for supported write APIs")
 
 	root.AddCommand(newVersionCommand(opts))
+	root.AddCommand(newUpdateCommand(opts))
 	root.AddCommand(newSetupCommand(opts))
 	root.AddCommand(newConfigCommand(opts))
 	root.AddCommand(newConfigProfileCommand(opts))

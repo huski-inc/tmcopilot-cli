@@ -22,6 +22,7 @@ Install · Quick Start · Authentication · Features · Agent Skills · Output &
 - Structured output: JSON by default, with `pretty`, `raw`, `ndjson`, and `csv` for people and programs
 - Large exports: paginated commands support `--page-all`, field selection, file output, and manifests
 - Safer operations: API keys are never printed; writes support `--dry-run`; destructive commands require `--yes`
+- Automatic updates: interactive terminals check every two hours and install newer CLI releases automatically
 - Raw API fallback: use `tmc api` when a typed command does not exist yet
 
 ## Features
@@ -103,6 +104,8 @@ Step 4: start using TMCopilot.
 tmc search trademarks --name Nike --class 25,35 --limit 20
 tmc portfolio trademarks list --page 1 --page-size 20
 ```
+
+The CLI checks for updates automatically at most once every two hours in interactive terminals. When a newer version is available, it runs the npm installer automatically and writes installer output to stderr.
 
 ### Quick Start For AI Agents
 
@@ -190,6 +193,39 @@ Supported environment variables:
 - `TMCOPILOT_API_KEY` or `TMC_API_KEY`
 - `TMCOPILOT_ENDPOINT` or `TMC_ENDPOINT`
 - `TMCOPILOT_HOME`, which changes the local config directory from the default `~/.tmcopilot`
+- `TMCOPILOT_NO_UPDATE_CHECK=1`, which disables automatic update checks
+- `TMCOPILOT_NO_AUTO_UPDATE=1`, which keeps automatic checks but prints the install command instead of running it
+- `TMCOPILOT_UPDATE_CHECK_INTERVAL=2h`, which changes the automatic update check interval
+
+## Updates
+
+`tmc` automatically checks npm package metadata at most once every two hours when stderr is an interactive terminal. When a newer version is available, it runs `npx --yes @tmcopilot/cli@<channel> update` and keeps all installer output on stderr so command stdout stays machine-readable. The check is silent when there is no newer version, when the network is unavailable, in non-interactive scripts, or when the binary is a local `dev` build.
+
+Check manually without installing:
+
+```bash
+tmc update check
+```
+
+Check and install from the current channel:
+
+```bash
+tmc update
+```
+
+Install the latest stable release explicitly:
+
+```bash
+npx --yes @tmcopilot/cli@latest update
+```
+
+Install the latest experimental release explicitly:
+
+```bash
+npx --yes @tmcopilot/cli@experimental update
+```
+
+The update check cache is stored at `~/.tmcopilot/update-check.json`.
 
 ## Common Commands
 

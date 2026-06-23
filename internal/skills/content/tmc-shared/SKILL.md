@@ -1,6 +1,6 @@
 ---
 name: tmc-shared
-version: 1.3.0
+version: 1.4.0
 description: "TMCopilot CLI shared guidance: auth, output contracts, safety flags, large-result rules, and when to use catalog/schema-style discovery."
 cliHelp: "tmc --help"
 ---
@@ -18,6 +18,7 @@ Read this first before using other TMCopilot CLI skills.
 - Add `--openapi` only when raw Swagger definitions are necessary.
 - Use `tmc api catalog` to discover generated Swagger endpoints.
 - Use `tmc api schema METHOD /path` only for raw API fallback or endpoint debugging.
+- Use `tmc update check` when the user asks whether the local CLI is current. Automatic update checks may install newer releases in interactive terminals; set `TMCOPILOT_NO_AUTO_UPDATE=1` when local binaries must not be modified.
 - Use `--output` for large JSON.
 - Use `--page-all` only on paginated list commands; it pages through the API one page at a time.
 - Prefer `--format ndjson --output file.ndjson --manifest file.manifest.json` for large exports.
@@ -38,11 +39,16 @@ printf '%s' "$TMCOPILOT_API_KEY" | tmc setup --api-key-stdin
 tmc auth status
 tmc auth whoami
 tmc auth workspaces
+tmc update check
 ```
 
 `tmc setup` and `tmc auth login` create a browser authorization request, poll for a one-time API key, and store it locally. They do not print the raw key.
 
 For agent environments, prefer `tmc setup --no-wait`. Send the printed authorization URL to the user, wait for approval, then run `tmc setup --request-id <request_id>`. The pending poll token is stored locally and must not be copied into chat or logs.
+
+## Updates
+
+Automatic update checks run at most once every two hours in interactive terminals. When a newer version is available, they run the npm installer and keep installer output on stderr. `tmc update check` returns a JSON envelope with `current_version`, `latest_version`, `update_available`, and `install_command` without installing.
 
 ## Diagnostics
 

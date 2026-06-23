@@ -15,6 +15,13 @@ Use `tmc agent bootstrap --check` when credentials may already be configured. It
 
 Use `tmc skills read <skill>/references/<file>.md --json` when a structured agent response is easier to parse than raw markdown.
 
+Version checks:
+
+- Use `tmc update check` when the user asks whether the CLI is current.
+- Automatic update checks in interactive terminals install newer CLI releases and keep installer output on stderr.
+- In scripted agent runs, set `TMCOPILOT_NO_AUTO_UPDATE=1` when command execution must not modify local binaries.
+- Do not run explicit installer commands such as `npx --yes @tmcopilot/cli@experimental update` unless the user asks for an update.
+
 Setup order:
 
 - Prefer `tmc setup` for a human-operated terminal.

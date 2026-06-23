@@ -60,6 +60,7 @@ func newSkillsListCommand(opts *globalOptions) *cobra.Command {
 
 func newSkillsReadCommand(opts *globalOptions) *cobra.Command {
 	var asJSON bool
+	var plain bool
 	cmd := &cobra.Command{
 		Use:   "read <skill[/path]> [path]",
 		Short: "Read a skill's SKILL.md or a reference file",
@@ -75,48 +76,52 @@ func newSkillsReadCommand(opts *globalOptions) *cobra.Command {
 					return err
 				}
 				isMainSkill := strings.TrimSpace(relPath) == ""
-				if asJSON {
-					rt, err := commandRuntime(cmd, opts, false)
-					if err != nil {
-						return err
-					}
-					path := relPath
-					if strings.TrimSpace(path) == "" {
-						path = "SKILL.md"
-					}
-					data := map[string]any{
-						"skill":   name,
-						"path":    path,
-						"content": string(raw),
-					}
-					if isMainSkill {
-						data["guidance"] = skillReadGuidance(name)
-					}
-					return writeResult(rt, data, nil)
+				rt, err := commandRuntime(cmd, opts, false)
+				if err != nil {
+					return err
 				}
-				if strings.TrimSpace(opts.output) != "" {
-					if err := output.WriteRawFile(opts.output, raw); err != nil {
-						return err
+				if asJSON && strings.EqualFold(rt.Format, "raw") {
+					rt.Format = "json"
+				}
+				if plain || (!asJSON && strings.EqualFold(rt.Format, "raw")) {
+					if strings.TrimSpace(rt.OutputPath) != "" {
+						if err := output.WriteRawFile(rt.OutputPath, raw); err != nil {
+							return err
+						}
+						return output.WriteTo(cmd.OutOrStdout(), "json", "", map[string]any{
+							"path":  rt.OutputPath,
+							"bytes": len(raw),
+						}, nil)
 					}
-					return output.WriteTo(cmd.OutOrStdout(), "json", "", map[string]any{
-						"path":  opts.output,
-						"bytes": len(raw),
-					}, nil)
+					_, err = cmd.OutOrStdout().Write(raw)
+					if err == nil && isMainSkill {
+						fmt.Fprintln(cmd.ErrOrStderr(), skillReadGuidance(name))
+					}
+					return err
 				}
-				_, err = cmd.OutOrStdout().Write(raw)
-				if err == nil && isMainSkill {
-					fmt.Fprintln(cmd.ErrOrStderr(), skillReadGuidance(name))
+				path := relPath
+				if strings.TrimSpace(path) == "" {
+					path = "SKILL.md"
 				}
-				return err
+				data := map[string]any{
+					"skill":   name,
+					"path":    path,
+					"content": string(raw),
+				}
+				if isMainSkill {
+					data["guidance"] = skillReadGuidance(name)
+				}
+				return writeResult(rt, data, nil)
 			})
 		},
 	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "output as a JSON envelope instead of raw markdown")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "force a JSON envelope; JSON is the default unless --format raw or --plain is set")
+	cmd.Flags().BoolVar(&plain, "plain", false, "output raw markdown instead of a JSON envelope")
 	return cmd
 }
 
 func skillReadGuidance(name string) string {
-	return fmt.Sprintf("> Tip: read referenced files with `tmc skills read %s <relative-path>` or `tmc skills read %s/references/<file>.md --json` so guidance stays version-matched with this CLI build.", name, name)
+	return fmt.Sprintf("> Tip: read referenced files with `tmc skills read %s <relative-path>` so guidance stays version-matched with this CLI build; use `--format raw` only when plain markdown is required.", name)
 }
 
 func splitSkillTarget(value string) (string, string) {

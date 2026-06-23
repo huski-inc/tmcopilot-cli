@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/huski-inc/tmcopilot-cli/internal/openapi"
 	"github.com/huski-inc/tmcopilot-cli/internal/output"
 )
 
@@ -25,6 +26,11 @@ func executeAPIAndWrite(cmd *cobra.Command, opts *globalOptions, method string, 
 
 func executeAPIAndWriteWithHeaders(cmd *cobra.Command, opts *globalOptions, method string, path string, query url.Values, body any, headers map[string]string) error {
 	method = strings.ToUpper(method)
+	if isRawAPIFallbackCommand(cmd) {
+		if err := ensurePublicAPIFallbackAllowed(method, path); err != nil {
+			return err
+		}
+	}
 	if err := ensureWriteAllowed(opts, method, path); err != nil {
 		return err
 	}
@@ -119,6 +125,25 @@ func ensureWriteAllowed(opts *globalOptions, method string, path string) error {
 		return nil
 	}
 	return fmt.Errorf("destructive request %s %s requires --yes or --dry-run", method, path)
+}
+
+func ensurePublicAPIFallbackAllowed(method string, path string) error {
+	endpoint, ok := openapi.FindEndpoint(method, normalizeCatalogPath(path))
+	if !ok {
+		return fmt.Errorf("endpoint not found in catalog")
+	}
+	if openapi.IsInternalEndpoint(endpoint) {
+		return fmt.Errorf("endpoint is not available through the public CLI API fallback")
+	}
+	return nil
+}
+
+func isRawAPIFallbackCommand(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
+	path := cmd.CommandPath()
+	return path == "tmc api" || path == "tmc api download"
 }
 
 func isDestructiveRequest(method string, path string) bool {

@@ -76,7 +76,7 @@ func newAPICatalogCommand(opts *globalOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				items := openapi.FilterEndpoints(tag, coverage)
+				items, hiddenInternal := openapi.FilterEndpointsForCatalog(tag, coverage)
 				search = strings.TrimSpace(strings.ToLower(search))
 				if search != "" {
 					filtered := make([]openapi.Endpoint, 0, len(items))
@@ -89,10 +89,11 @@ func newAPICatalogCommand(opts *globalOptions) *cobra.Command {
 					items = filtered
 				}
 				return writeResult(rt, map[string]any{
-					"source_hash": openapi.SourceHash,
-					"source_path": openapi.SourcePath,
-					"count":       len(items),
-					"items":       items,
+					"source_hash":           openapi.SourceHash,
+					"source_path":           openapi.SourcePath,
+					"count":                 len(items),
+					"hidden_internal_count": hiddenInternal,
+					"items":                 items,
 				}, nil)
 			})
 		},
@@ -117,6 +118,9 @@ func newAPIEndpointCommand(opts *globalOptions) *cobra.Command {
 				endpoint, ok := openapi.FindEndpoint(args[0], normalizeCatalogPath(args[1]))
 				if !ok {
 					return fmt.Errorf("endpoint not found in catalog: %s %s", strings.ToUpper(args[0]), args[1])
+				}
+				if openapi.IsInternalEndpoint(endpoint) {
+					return fmt.Errorf("endpoint not found in catalog")
 				}
 				return writeResult(rt, endpoint, map[string]any{
 					"source_hash": openapi.SourceHash,
@@ -210,6 +214,11 @@ func newAPIDownloadCommand(opts *globalOptions) *cobra.Command {
 func executeAPIDownloadAndWrite(cmd *cobra.Command, opts *globalOptions, method string, path string, query url.Values, body any, headers map[string]string) error {
 	if opts == nil || strings.TrimSpace(opts.output) == "" {
 		return fmt.Errorf("--output is required for download")
+	}
+	if isRawAPIFallbackCommand(cmd) {
+		if err := ensurePublicAPIFallbackAllowed(method, path); err != nil {
+			return err
+		}
 	}
 	if err := ensureWriteAllowed(opts, method, path); err != nil {
 		return err

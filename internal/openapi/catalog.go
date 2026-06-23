@@ -44,9 +44,15 @@ func FindEndpointSchema(method string, path string) (EndpointSchema, bool) {
 }
 
 func FilterEndpoints(tag string, coverage string) []Endpoint {
+	items, _ := FilterEndpointsForCatalog(tag, coverage)
+	return items
+}
+
+func FilterEndpointsForCatalog(tag string, coverage string) ([]Endpoint, int) {
 	tag = strings.TrimSpace(strings.ToLower(tag))
 	coverage = strings.TrimSpace(strings.ToLower(coverage))
 	out := make([]Endpoint, 0, len(Endpoints))
+	hidden := 0
 	for _, endpoint := range Endpoints {
 		if coverage != "" && strings.ToLower(endpoint.Coverage) != coverage {
 			continue
@@ -54,9 +60,13 @@ func FilterEndpoints(tag string, coverage string) []Endpoint {
 		if tag != "" && !endpointHasTag(endpoint, tag) {
 			continue
 		}
+		if IsInternalEndpoint(endpoint) {
+			hidden++
+			continue
+		}
 		out = append(out, endpoint)
 	}
-	return out
+	return out, hidden
 }
 
 func endpointHasTag(endpoint Endpoint, tag string) bool {
@@ -66,4 +76,8 @@ func endpointHasTag(endpoint Endpoint, tag string) bool {
 		}
 	}
 	return false
+}
+
+func IsInternalEndpoint(endpoint Endpoint) bool {
+	return !strings.EqualFold(endpoint.Coverage, "typed")
 }

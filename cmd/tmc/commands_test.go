@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/huski-inc/tmcopilot-cli/internal/config"
+	"github.com/huski-inc/tmcopilot-cli/internal/openapi"
 )
 
 func executeRootCommand(t *testing.T, args []string) (string, string) {
@@ -2193,6 +2194,76 @@ func TestAPICatalogFiltersEndpoints(t *testing.T) {
 	}
 }
 
+func TestAPICatalogHidesInternalRawEndpointsByDefault(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	restricted := restrictedCatalogEndpoint(t)
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"api", "catalog", "--coverage", restricted.Coverage})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("catalog failed: %v stderr=%s", err, stderr.String())
+	}
+	var result struct {
+		Data struct {
+			Count               int `json:"count"`
+			HiddenInternalCount int `json:"hidden_internal_count"`
+			Items               []struct {
+				Path string `json:"path"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode catalog: %v output=%s", err, stdout.String())
+	}
+	if result.Data.HiddenInternalCount == 0 {
+		t.Fatalf("catalog should report hidden restricted endpoints: %#v", result.Data)
+	}
+	for _, item := range result.Data.Items {
+		if item.Path == restricted.Path {
+			t.Fatalf("catalog exposed restricted endpoint: %#v", item)
+		}
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"api", "catalog", "--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("catalog help failed: %v stderr=%s", err, stderr.String())
+	}
+	restrictedFlag := strings.Join([]string{"include", "internal"}, "-")
+	if bytes.Contains(stdout.Bytes(), []byte(restrictedFlag)) {
+		t.Fatalf("catalog help should not expose restricted debug flags: %s", stdout.String())
+	}
+}
+
+func restrictedCatalogEndpoint(t *testing.T) openapi.Endpoint {
+	t.Helper()
+	for _, endpoint := range openapi.Endpoints {
+		if openapi.IsInternalEndpoint(endpoint) {
+			return endpoint
+		}
+	}
+	t.Fatal("test catalog has no restricted endpoint")
+	return openapi.Endpoint{}
+}
+
+func publicGETCatalogEndpoint(t *testing.T) openapi.Endpoint {
+	t.Helper()
+	for _, endpoint := range openapi.Endpoints {
+		if !openapi.IsInternalEndpoint(endpoint) && endpoint.Method == http.MethodGet && !strings.Contains(endpoint.Path, "{") {
+			return endpoint
+		}
+	}
+	t.Fatal("test catalog has no public GET endpoint")
+	return openapi.Endpoint{}
+}
+
 func TestSchemaShowsEndpointMetadata(t *testing.T) {
 	t.Setenv("TMCOPILOT_HOME", t.TempDir())
 
@@ -2208,6 +2279,7 @@ func TestSchemaShowsEndpointMetadata(t *testing.T) {
 		`"command":"tmc search trademarks"`,
 		`"path":"/trademark/search"`,
 		`"--class"`,
+		`"--format"`,
 	} {
 		if !bytes.Contains(stdout.Bytes(), []byte(want)) {
 			t.Fatalf("schema output missing %q: %s", want, stdout.String())
@@ -2215,6 +2287,77 @@ func TestSchemaShowsEndpointMetadata(t *testing.T) {
 	}
 	if bytes.Contains(stdout.Bytes(), []byte(`"definitions"`)) {
 		t.Fatalf("schema output should not include raw OpenAPI definitions by default: %s", stdout.String())
+	}
+}
+
+func TestSchemaListsAllRunnableCommandsForAgents(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("schema list failed: %v stderr=%s", err, stderr.String())
+	}
+	var result struct {
+		Data struct {
+			Commands []struct {
+				Command string `json:"command"`
+				Kind    string `json:"kind"`
+				Safety  struct {
+					ReadOnly    bool `json:"read_only"`
+					SideEffect  bool `json:"side_effect"`
+					Destructive bool `json:"destructive"`
+				} `json:"safety"`
+			} `json:"commands"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode schema list: %v output=%s", err, stdout.String())
+	}
+	commands := map[string]struct {
+		Kind        string
+		ReadOnly    bool
+		SideEffect  bool
+		Destructive bool
+	}{}
+	for _, item := range result.Data.Commands {
+		commands[item.Command] = struct {
+			Kind        string
+			ReadOnly    bool
+			SideEffect  bool
+			Destructive bool
+		}{
+			Kind:        item.Kind,
+			ReadOnly:    item.Safety.ReadOnly,
+			SideEffect:  item.Safety.SideEffect,
+			Destructive: item.Safety.Destructive,
+		}
+	}
+	for _, want := range []string{
+		"tmc auth login",
+		"tmc auth logout",
+		"tmc config show",
+		"tmc skills read",
+		"tmc api catalog",
+		"tmc gap wait",
+		"tmc portfolio monitored-summary",
+		"tmc version",
+	} {
+		if _, ok := commands[want]; !ok {
+			t.Fatalf("schema list missing %s", want)
+		}
+	}
+	if got := commands["tmc auth logout"]; got.Kind != "local" || !got.SideEffect || !got.Destructive {
+		t.Fatalf("auth logout safety mismatch: %#v", got)
+	}
+	if got := commands["tmc skills read"]; got.Kind != "local" || !got.ReadOnly || got.SideEffect {
+		t.Fatalf("skills read safety mismatch: %#v", got)
+	}
+	if _, ok := commands["tmc portfolio tasks list"]; ok {
+		t.Fatalf("schema list should not expose removed portfolio tasks command")
 	}
 }
 
@@ -2461,6 +2604,51 @@ func TestAPIEndpointSchemaShowsRawEndpointMetadata(t *testing.T) {
 	}
 }
 
+func TestInternalEndpointsAreNotAvailableThroughPublicAPIFallback(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	restricted := restrictedCatalogEndpoint(t)
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "api endpoint",
+			args: []string{"api", "endpoint", restricted.Method, restricted.Path},
+		},
+		{
+			name: "api schema",
+			args: []string{"api", "schema", restricted.Method, restricted.Path},
+		},
+		{
+			name: "raw api",
+			args: []string{"--dry-run", "api", restricted.Method, restricted.Path},
+		},
+		{
+			name: "api download",
+			args: []string{"--dry-run", "--output", filepath.Join(t.TempDir(), "raw.bin"), "api", "download", restricted.Method, restricted.Path},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := NewRootCommand()
+			var stdout, stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			cmd.SetArgs(tc.args)
+			if err := cmd.Execute(); err == nil {
+				t.Fatalf("expected internal endpoint to be rejected: stdout=%s", stdout.String())
+			}
+			if bytes.Contains(stdout.Bytes(), []byte(restricted.Path)) {
+				t.Fatalf("stdout should not expose internal endpoint metadata: %s", stdout.String())
+			}
+			if bytes.Contains(stderr.Bytes(), []byte(restricted.Path)) {
+				t.Fatalf("stderr should not confirm internal endpoint path: %s", stderr.String())
+			}
+		})
+	}
+}
+
 func TestSchemaRejectsRawEndpointFormWithHint(t *testing.T) {
 	t.Setenv("TMCOPILOT_HOME", t.TempDir())
 
@@ -2548,6 +2736,7 @@ func TestExecuteUnknownFlagWritesStructuredSuggestion(t *testing.T) {
 }
 
 func TestAPIDownloadWritesRawResponseBody(t *testing.T) {
+	endpoint := publicGETCatalogEndpoint(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("X-Test"); got != "yes" {
 			t.Fatalf("X-Test header = %q", got)
@@ -2567,7 +2756,7 @@ func TestAPIDownloadWritesRawResponseBody(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--endpoint", server.URL,
 		"--output", outFile,
-		"api", "download", "GET", "/files/raw",
+		"api", "download", endpoint.Method, endpoint.Path,
 		"--header", "X-Test=yes",
 	})
 	if err := cmd.Execute(); err != nil {
@@ -2947,7 +3136,21 @@ func TestSkillsListAndRead(t *testing.T) {
 	if err := readCmd.Execute(); err != nil {
 		t.Fatalf("skills read failed: %v stderr=%s", err, readErr.String())
 	}
-	if !bytes.Contains(readOut.Bytes(), []byte("tmc search trademarks")) {
+	var result struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Skill   string `json:"skill"`
+			Path    string `json:"path"`
+			Content string `json:"content"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(readOut.Bytes(), &result); err != nil {
+		t.Fatalf("decode skills read: %v output=%s", err, readOut.String())
+	}
+	if !result.OK || result.Data.Skill != "tmc-trademark-search" || result.Data.Path != "SKILL.md" {
+		t.Fatalf("skills read metadata mismatch: %#v", result.Data)
+	}
+	if !strings.Contains(result.Data.Content, "tmc search trademarks") {
 		t.Fatalf("skills read missing command guidance: %s", readOut.String())
 	}
 }
@@ -2979,7 +3182,7 @@ func TestSkillsReadSupportsOutputFile(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
-	cmd.SetArgs([]string{"--output", outFile, "skills", "read", "tmc-trademark-search"})
+	cmd.SetArgs([]string{"--format", "raw", "--output", outFile, "skills", "read", "tmc-trademark-search"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("skills read output failed: %v stderr=%s", err, stderr.String())
 	}
@@ -2992,6 +3195,25 @@ func TestSkillsReadSupportsOutputFile(t *testing.T) {
 	}
 	if !bytes.Contains(stdout.Bytes(), []byte(`"bytes":`)) {
 		t.Fatalf("stdout missing output summary: %s", stdout.String())
+	}
+}
+
+func TestSkillsReadRawFormatWritesPlainMarkdown(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"--format", "raw", "skills", "read", "tmc-trademark-search"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("skills read raw failed: %v stderr=%s", err, stderr.String())
+	}
+	if !bytes.HasPrefix(stdout.Bytes(), []byte("---\nname: tmc-trademark-search")) {
+		t.Fatalf("raw skills output should be plain markdown: %s", stdout.String())
+	}
+	if bytes.Contains(stdout.Bytes(), []byte(`"ok":true`)) {
+		t.Fatalf("raw skills output should not be JSON envelope: %s", stdout.String())
 	}
 }
 

@@ -18,6 +18,7 @@ type commandEndpointSpec struct {
 
 type commandSchema struct {
 	Command       string                  `json:"command"`
+	Kind          string                  `json:"kind,omitempty"`
 	Aliases       []string                `json:"aliases,omitempty"`
 	Short         string                  `json:"short,omitempty"`
 	Use           string                  `json:"use,omitempty"`
@@ -34,6 +35,7 @@ type commandSchema struct {
 
 type commandListItem struct {
 	Command       string             `json:"command"`
+	Kind          string             `json:"kind,omitempty"`
 	Aliases       []string           `json:"aliases,omitempty"`
 	Short         string             `json:"short,omitempty"`
 	Endpoint      *openapi.Endpoint  `json:"endpoint,omitempty"`
@@ -91,7 +93,7 @@ Open API fallback and debugging.`,
 					return err
 				}
 				if len(args) == 0 {
-					items := listMappedCommandSchemas(cmd.Root(), "")
+					items := listCommandSchemas(cmd.Root(), "", false)
 					return writeResult(rt, map[string]any{
 						"count":    len(items),
 						"commands": items,
@@ -156,16 +158,20 @@ func buildCommandSchema(cmd *cobra.Command, includeOpenAPI bool) commandSchema {
 	key := commandKey(cmd)
 	result := commandSchema{
 		Command:       "tmc " + key,
+		Kind:          commandKindFor(key),
 		Aliases:       commandAliases(cmd),
 		Short:         cmd.Short,
 		Use:           cmd.UseLine(),
 		Flags:         collectFlags(cmd.Flags()),
+		GlobalFlags:   collectFlags(cmd.Root().PersistentFlags()),
 		Children:      listChildCommandSchemas(cmd),
 		SchemaCommand: "tmc schema " + key,
 	}
+	result.Safety = localCommandSafetyFor(key, cmd)
 	if spec, ok := commandEndpointSpecs[key]; ok {
 		if schema, err := endpointSchemaFor(spec.Method, spec.Path); err == nil {
 			endpoint := schema.Endpoint
+			result.Kind = "endpoint"
 			result.Endpoint = &endpoint
 			result.Safety = commandSafetyFor(key, spec)
 			if includeOpenAPI {
@@ -178,29 +184,23 @@ func buildCommandSchema(cmd *cobra.Command, includeOpenAPI bool) commandSchema {
 	return result
 }
 
-func listMappedCommandSchemas(root *cobra.Command, prefix string) []commandListItem {
-	items := make([]commandListItem, 0, len(commandEndpointSpecs))
-	for key, spec := range commandEndpointSpecs {
-		if prefix != "" && !strings.HasPrefix(key, prefix+" ") {
-			continue
+func listCommandSchemas(root *cobra.Command, prefix string, includeExact bool) []commandListItem {
+	items := []commandListItem{}
+	walkRunnableCommands(root, func(cmd *cobra.Command) {
+		key := commandKey(cmd)
+		if key == "" {
+			return
 		}
-		cmd, err := resolveSchemaCommandTarget(root, strings.Fields(key))
-		if err != nil {
-			continue
+		if prefix != "" {
+			if key == prefix && !includeExact {
+				return
+			}
+			if key != prefix && !strings.HasPrefix(key, prefix+" ") {
+				return
+			}
 		}
-		item := commandListItem{
-			Command:       "tmc " + key,
-			Aliases:       commandAliases(cmd),
-			Short:         cmd.Short,
-			SchemaCommand: "tmc schema " + key,
-		}
-		if endpoint, ok := openapi.FindEndpoint(spec.Method, spec.Path); ok {
-			item.Endpoint = &endpoint
-		}
-		item.Safety = commandSafetyFor(key, spec)
-		item.Pagination = commandPaginationFor(cmd)
-		items = append(items, item)
-	}
+		items = append(items, buildCommandListItem(cmd, key))
+	})
 	sortCommandList(items)
 	return items
 }
@@ -210,7 +210,7 @@ func listChildCommandSchemas(cmd *cobra.Command) []commandListItem {
 	if prefix == "" {
 		return nil
 	}
-	items := listMappedCommandSchemas(cmd.Root(), prefix)
+	items := listCommandSchemas(cmd.Root(), prefix, false)
 	if len(items) > 0 {
 		return items
 	}
@@ -221,13 +221,73 @@ func listChildCommandSchemas(cmd *cobra.Command) []commandListItem {
 		key := commandKey(child)
 		items = append(items, commandListItem{
 			Command:       "tmc " + key,
+			Kind:          commandKindFor(key),
 			Aliases:       commandAliases(child),
 			Short:         child.Short,
+			Safety:        localCommandSafetyFor(key, child),
+			Pagination:    commandPaginationFor(child),
 			SchemaCommand: "tmc schema " + key,
 		})
 	}
 	sortCommandList(items)
 	return items
+}
+
+func walkRunnableCommands(cmd *cobra.Command, visit func(*cobra.Command)) {
+	if cmd == nil {
+		return
+	}
+	for _, child := range cmd.Commands() {
+		if shouldSkipSchemaCommand(child) {
+			continue
+		}
+		if child.Runnable() {
+			visit(child)
+		}
+		walkRunnableCommands(child, visit)
+	}
+}
+
+func shouldSkipSchemaCommand(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return true
+	}
+	if cmd.Hidden {
+		return true
+	}
+	switch cmd.Name() {
+	case "completion", "help":
+		return true
+	default:
+		return false
+	}
+}
+
+func buildCommandListItem(cmd *cobra.Command, key string) commandListItem {
+	item := commandListItem{
+		Command:       "tmc " + key,
+		Kind:          commandKindFor(key),
+		Aliases:       commandAliases(cmd),
+		Short:         cmd.Short,
+		Safety:        localCommandSafetyFor(key, cmd),
+		Pagination:    commandPaginationFor(cmd),
+		SchemaCommand: "tmc schema " + key,
+	}
+	if spec, ok := commandEndpointSpecs[key]; ok {
+		item.Kind = "endpoint"
+		if endpoint, ok := openapi.FindEndpoint(spec.Method, spec.Path); ok {
+			item.Endpoint = &endpoint
+		}
+		item.Safety = commandSafetyFor(key, spec)
+	}
+	return item
+}
+
+func commandKindFor(key string) string {
+	if _, ok := commandEndpointSpecs[key]; ok {
+		return "endpoint"
+	}
+	return "local"
 }
 
 func sortCommandList(items []commandListItem) {
@@ -242,6 +302,9 @@ func endpointSchemaFor(method string, path string) (openapi.EndpointSchema, erro
 	schema, ok := openapi.FindEndpointSchema(method, path)
 	if !ok {
 		return openapi.EndpointSchema{}, fmt.Errorf("schema not found in catalog: %s %s", method, path)
+	}
+	if openapi.IsInternalEndpoint(schema.Endpoint) {
+		return openapi.EndpointSchema{}, fmt.Errorf("schema not found in catalog")
 	}
 	return schema, nil
 }
@@ -331,6 +394,41 @@ func commandSafetyFor(key string, spec commandEndpointSpec) *commandSafety {
 		RequiresYes:    destructive,
 		Hint:           hint,
 	}
+}
+
+func localCommandSafetyFor(key string, cmd *cobra.Command) *commandSafety {
+	key = strings.TrimSpace(key)
+	if spec, ok := localCommandSafetySpecs[key]; ok {
+		return cloneCommandSafety(spec)
+	}
+	if key == "api" || strings.HasPrefix(key, "api ") {
+		return &commandSafety{
+			AuthRequired:   true,
+			ReadOnly:       false,
+			SideEffect:     true,
+			Destructive:    false,
+			SupportsDryRun: true,
+			RequiresYes:    false,
+			Hint:           "prefer typed commands; for raw write methods use --dry-run --request-out before running",
+		}
+	}
+	if cmd != nil && cmd.Runnable() {
+		return &commandSafety{
+			AuthRequired:   false,
+			ReadOnly:       true,
+			SideEffect:     false,
+			Destructive:    false,
+			SupportsDryRun: false,
+			RequiresYes:    false,
+			Hint:           "local CLI command; inspect flags before running",
+		}
+	}
+	return nil
+}
+
+func cloneCommandSafety(in commandSafety) *commandSafety {
+	out := in
+	return &out
 }
 
 func isWriteMethod(method string) bool {
@@ -432,6 +530,196 @@ func commandUseLine(cmd *cobra.Command, key string) string {
 		return "tmc " + key
 	}
 	return line
+}
+
+var localCommandSafetySpecs = map[string]commandSafety{
+	"agent bootstrap": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "local discovery command; --check verifies credentials when configured",
+	},
+	"api catalog": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "local OpenAPI catalog inspection; prefer typed coverage for normal workflows",
+	},
+	"api endpoint": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "local OpenAPI endpoint metadata inspection",
+	},
+	"api schema": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "local OpenAPI schema inspection; use tmc schema <command...> first",
+	},
+	"auth import-key": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: true,
+		Hint:           "stores a local API key; use --dry-run to preview without writing credentials",
+	},
+	"auth login": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: true,
+		Hint:           "starts an auth flow and stores a local API key; use --dry-run to preview",
+	},
+	"auth logout": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		Destructive:    true,
+		SupportsDryRun: true,
+		Hint:           "removes locally stored credentials; use --dry-run to preview",
+	},
+	"auth status": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "reads local auth configuration; --check calls /auth/me when an API key is configured",
+	},
+	"config init": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "creates or rewrites the local CLI config file",
+	},
+	"config profile add": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "adds or replaces a local config profile",
+	},
+	"config profile list": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "reads local config profiles",
+	},
+	"config profile use": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "switches the active local config profile",
+	},
+	"config set": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "updates the active local config profile",
+	},
+	"config show": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "reads local CLI configuration",
+	},
+	"doctor": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "runs read-only network and auth checks",
+	},
+	"doctor auth": {
+		AuthRequired:   true,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "calls /auth/me to verify credentials",
+	},
+	"doctor network": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "calls /version to verify endpoint reachability",
+	},
+	"gap wait": {
+		AuthRequired:   true,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "polls a gap analysis with GET requests until a terminal status",
+	},
+	"profile add": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "adds or replaces a local config profile",
+	},
+	"portfolio monitored-summary": {
+		AuthRequired:   true,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "calls the portfolio monitored summary endpoint; OpenAPI metadata is not available in this CLI build",
+	},
+	"profile list": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "reads local config profiles",
+	},
+	"profile use": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "switches the active local config profile",
+	},
+	"schema": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "local command schema inspection",
+	},
+	"setup": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: true,
+		Hint:           "sets up local config and credentials; use --dry-run to preview",
+	},
+	"skills list": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "reads embedded skill inventory from this CLI build",
+	},
+	"skills read": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "reads embedded skill content from this CLI build",
+	},
+	"update": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "checks npm metadata and may install a newer CLI version",
+	},
+	"update check": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		SupportsDryRun: false,
+		Hint:           "checks npm metadata and updates the local update-check cache",
+	},
+	"version": {
+		AuthRequired:   false,
+		ReadOnly:       true,
+		SupportsDryRun: false,
+		Hint:           "reads local CLI version metadata",
+	},
 }
 
 var commandEndpointSpecs = map[string]commandEndpointSpec{

@@ -23,7 +23,7 @@ Install · Quick Start · Authentication · Features · Agent Skills · Output &
 - Large exports: paginated commands support `--page-all`, field selection, file output, and manifests
 - Safer operations: API keys are never printed; writes support `--dry-run`; destructive commands require `--yes`
 - Automatic updates: interactive terminals check every two hours and install newer CLI releases automatically
-- Raw API fallback: use `tmc api` when a typed command does not exist yet
+- Raw API fallback: use `tmc api` only for public catalog endpoint debugging
 
 ## Features
 
@@ -357,13 +357,15 @@ tmc api schema POST /trademark/search
 
 ### 3. Raw API
 
-When a backend endpoint exists but a typed command has not been added yet, call the REST API directly:
+Use raw API calls only for public catalog endpoint debugging or reproducing typed command requests:
 
 ```bash
 tmc api GET /auth/me
 tmc api POST /trademark/search --data @request.json
-tmc api GET /new/path --param page=1 --param page_size=20
+tmc api endpoint POST /trademark/search
 ```
+
+Only public catalog endpoints are available through `tmc api catalog`, `tmc api endpoint`, `tmc api schema`, and the raw `tmc api` fallback.
 
 ## Output And Export
 
@@ -444,10 +446,12 @@ tmc agent bootstrap
 tmc skills list
 tmc skills read tmc-shared
 tmc skills read tmc-trademark-search
-tmc skills read tmc-openapi/references/catalog.md --json
+tmc skills read tmc-openapi/references/catalog.md
 ```
 
 `tmc agent bootstrap --check` returns one machine-readable snapshot with command aliases, auth status, configured endpoint, available skills, discovery commands, safety guidance, and recommended next steps. Use it as the first command when an AI agent is unsure how the local CLI is configured.
+
+`tmc skills read` follows the global output contract and returns a JSON envelope by default. Use `tmc --format raw skills read <skill>` only when raw markdown is required.
 
 ## Configuration And Profiles
 

@@ -5,8 +5,10 @@ The catalog is generated from `tmcopilot-project/backend/docs/swagger/swagger.js
 Coverage values:
 
 - `typed`: has a first-class CLI command.
-- `raw-ready`: no typed command yet, but likely suitable for `tmc api`.
-- `raw`: available through `tmc api`; inspect endpoint shape before calling.
+- `raw-ready`: generated endpoint metadata that is not exposed through the public CLI catalog.
+- `raw`: generated endpoint metadata that is not exposed through the public CLI catalog.
+
+Only public typed endpoints are exposed through CLI catalog, endpoint/schema inspection, or raw API fallback.
 
 Useful commands:
 

@@ -1,6 +1,6 @@
 ---
 name: tmc-shared
-version: 1.4.0
+version: 1.4.2
 description: "TMCopilot CLI shared guidance: auth, output contracts, safety flags, large-result rules, and when to use catalog/schema-style discovery."
 cliHelp: "tmc --help"
 ---
@@ -16,8 +16,8 @@ Read this first before using other TMCopilot CLI skills.
 - Use `tmc --help` and `tmc <command> --help` for command flags.
 - Use `tmc schema <command...>` to inspect command flags, endpoint summary, safety metadata, pagination support, and examples before using unfamiliar flags.
 - Add `--openapi` only when raw Swagger definitions are necessary.
-- Use `tmc api catalog` to discover generated Swagger endpoints.
-- Use `tmc api schema METHOD /path` only for raw API fallback or endpoint debugging.
+- Use `tmc api catalog` to discover public generated Swagger endpoints. Internal endpoints are not exposed through CLI catalog, endpoint/schema inspection, or raw API fallback.
+- Use `tmc api schema METHOD /path` only for public endpoint debugging.
 - Use `tmc update check` when the user asks whether the local CLI is current. Automatic update checks may install newer releases in interactive terminals; set `TMCOPILOT_NO_AUTO_UPDATE=1` when local binaries must not be modified.
 - Use `--output` for large JSON.
 - Use `--page-all` only on paginated list commands; it pages through the API one page at a time.
@@ -67,3 +67,5 @@ Default output is a JSON envelope:
 ```
 
 Errors are written to stderr with a stable `type`.
+
+`tmc skills read` also returns a JSON envelope by default. Use `tmc --format raw skills read <skill>` only when raw markdown is required.

@@ -1,6 +1,6 @@
 ---
 name: tmc-trademark-search
-version: 1.3.0
+version: 1.3.1
 description: "Trademark, office action, TTAB, lawsuit, lawyer, and company/owner search commands for TMCopilot."
 cliHelp: "tmc search --help; tmc lawsuits --help; tmc lawyers --help"
 ---
@@ -113,7 +113,7 @@ USPTO Office Action document download:
 tmc --output office-action.pdf search uspto-document --serial-number 97346091 --document-page-id <id> --document-type <type> --document-date <date>
 ```
 
-Schema inspection before raw API fallback:
+Schema inspection before command usage or public API debugging:
 
 ```bash
 tmc schema search trademarks

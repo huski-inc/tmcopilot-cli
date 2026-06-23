@@ -26,8 +26,14 @@ tmc portfolio trademarks monitor batch-toggle --trademark-id <id1>,<id2> --monit
 tmc portfolio groups list --keyword nike
 tmc portfolio groups monitor-toggle <group-id> --monitor-type office_action --enable=true
 tmc portfolio counts
-tmc portfolio actions office --keyword nike
-tmc portfolio actions conflict --risk high
+tmc portfolio actions office list --keyword nike
+tmc portfolio actions office deadlines --limit 10
+tmc portfolio actions office for-trademark <trademark-id>
+tmc portfolio actions conflict list --risk high
+tmc portfolio actions conflict groups --risk high
+tmc portfolio actions conflict for-trademark <trademark-id>
+tmc portfolio actions cbp list --status active
+tmc portfolio actions cbp service-requests
 tmc portfolio activity list --keyword nike
 ```
 

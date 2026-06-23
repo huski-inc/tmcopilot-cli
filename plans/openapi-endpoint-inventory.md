@@ -84,14 +84,14 @@
 | typed | GET | `/gap-analyses/{id}/shares` | gap-analysis | List gap analysis shares |
 | typed | DELETE | `/gap-analyses/{id}/shares/{token}` | gap-analysis | Delete gap analysis share |
 | typed | GET | `/portfolio/actions/cbp` | portfolio-action | List CBP recordations |
-| raw | GET | `/portfolio/actions/cbp/service-requests` | portfolio-action | List CBP recordation service requests |
-| raw | POST | `/portfolio/actions/cbp/service-requests` | portfolio-action | Submit a CBP recordation service request |
+| typed | GET | `/portfolio/actions/cbp/service-requests` | portfolio-action | List CBP recordation service requests |
+| typed | POST | `/portfolio/actions/cbp/service-requests` | portfolio-action | Submit a CBP recordation service request |
 | typed | GET | `/portfolio/actions/cbp/summary` | portfolio-action | Get CBP recordation summary |
 | typed | GET | `/portfolio/actions/conflict` | portfolio-action | List conflict actions |
-| raw | GET | `/portfolio/actions/conflict/groups` | portfolio-action | List grouped conflict actions |
+| typed | GET | `/portfolio/actions/conflict/groups` | portfolio-action | List grouped conflict actions |
 | typed | GET | `/portfolio/actions/conflict/summary` | portfolio-action | Get conflict action summary |
 | typed | GET | `/portfolio/actions/office` | portfolio-action | List office actions |
-| raw | GET | `/portfolio/actions/office/deadlines` | portfolio-action | Get upcoming deadlines |
+| typed | GET | `/portfolio/actions/office/deadlines` | portfolio-action | Get upcoming deadlines |
 | typed | GET | `/portfolio/actions/office/summary` | portfolio-action | Get office action summary |
 | typed | GET | `/portfolio/activity` | portfolio-action | List portfolio activity |
 | raw | GET | `/portfolio/tasks` | portfolio-task | List portfolio worker tasks |
@@ -112,15 +112,15 @@
 | typed | GET | `/portfolio/trademarks/search` | portfolio-trademark | Search portfolio trademarks |
 | typed | GET | `/portfolio/trademarks/{trademarkId}` | portfolio-trademark | Get a portfolio trademark |
 | typed | PUT | `/portfolio/trademarks/{trademarkId}` | portfolio-trademark | Update a portfolio trademark |
-| raw | GET | `/portfolio/trademarks/{trademarkId}/conflict-actions` | portfolio-action | List conflict actions by trademark |
-| raw | GET | `/portfolio/trademarks/{trademarkId}/conflict-actions/{id}` | portfolio-action | Get a conflict action |
-| raw | PUT | `/portfolio/trademarks/{trademarkId}/conflict-actions/{id}/status` | portfolio-action | Update conflict action status |
+| typed | GET | `/portfolio/trademarks/{trademarkId}/conflict-actions` | portfolio-action | List conflict actions by trademark |
+| typed | GET | `/portfolio/trademarks/{trademarkId}/conflict-actions/{id}` | portfolio-action | Get a conflict action |
+| typed | PUT | `/portfolio/trademarks/{trademarkId}/conflict-actions/{id}/status` | portfolio-action | Update conflict action status |
 | typed | GET | `/portfolio/trademarks/{trademarkId}/metadata` | portfolio-trademark | Get manual portfolio trademark metadata |
 | typed | PUT | `/portfolio/trademarks/{trademarkId}/metadata` | portfolio-trademark | Update manual portfolio trademark metadata |
 | typed | PUT | `/portfolio/trademarks/{trademarkId}/monitor` | portfolio-trademark | Update trademark monitor config |
-| raw | GET | `/portfolio/trademarks/{trademarkId}/office-actions` | portfolio-action | List office actions by trademark |
-| raw | GET | `/portfolio/trademarks/{trademarkId}/office-actions/{id}` | portfolio-action | Get an office action |
-| raw | PUT | `/portfolio/trademarks/{trademarkId}/office-actions/{id}/status` | portfolio-action | Update office action status |
+| typed | GET | `/portfolio/trademarks/{trademarkId}/office-actions` | portfolio-action | List office actions by trademark |
+| typed | GET | `/portfolio/trademarks/{trademarkId}/office-actions/{id}` | portfolio-action | Get an office action |
+| typed | PUT | `/portfolio/trademarks/{trademarkId}/office-actions/{id}/status` | portfolio-action | Update office action status |
 | typed | POST | `/trademark/detail` | trademark | Get trademark details |
 | typed | POST | `/trademark/image/task` | trademark | Create image search task |
 | typed | POST | `/trademark/image/task/result` | trademark | Get image search task result |

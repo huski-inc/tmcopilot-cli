@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1867,6 +1868,225 @@ func TestPortfolioMonitorCommandsBuildOpenAPIRequests(t *testing.T) {
 				t.Fatalf("path = %q, want %q", gotPath, tt.wantPath)
 			}
 			tt.wantBody(t, gotBody)
+		})
+	}
+}
+
+func TestPortfolioActionCommandsBuildRequests(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantMethod string
+		wantPath   string
+		wantQuery  map[string]string
+		wantBody   func(t *testing.T, body map[string]any)
+	}{
+		{
+			name:       "office deadlines",
+			args:       []string{"portfolio", "actions", "office", "deadlines", "--limit", "5"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/actions/office/deadlines",
+			wantQuery:  map[string]string{"limit": "5"},
+		},
+		{
+			name:       "office list",
+			args:       []string{"portfolio", "actions", "office", "list", "--page", "2", "--page-size", "5", "--keyword", "nike"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/actions/office",
+			wantQuery:  map[string]string{"page": "2", "page_size": "5", "keyword": "nike"},
+		},
+		{
+			name:       "conflict list",
+			args:       []string{"portfolio", "actions", "conflict", "list", "--page", "2", "--page-size", "5", "--risk", "high"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/actions/conflict",
+			wantQuery:  map[string]string{"page": "2", "page_size": "5", "risk": "high"},
+		},
+		{
+			name:       "cbp list",
+			args:       []string{"portfolio", "actions", "cbp", "list", "--page", "2", "--page-size", "5", "--status", "active"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/actions/cbp",
+			wantQuery:  map[string]string{"page": "2", "page_size": "5", "status": "active"},
+		},
+		{
+			name:       "conflict groups",
+			args:       []string{"portfolio", "actions", "conflict", "groups", "--page", "2", "--page-size", "3", "--risk", "high", "--group-by", "mark", "--sort", "due_date", "--sort-dir", "asc"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/actions/conflict/groups",
+			wantQuery: map[string]string{
+				"page":       "2",
+				"page_size":  "3",
+				"risk":       "high",
+				"group_by":   "mark",
+				"sort_field": "due_date",
+				"sort_dir":   "asc",
+			},
+		},
+		{
+			name:       "office actions by trademark",
+			args:       []string{"portfolio", "actions", "office", "for-trademark", "123", "--page", "4", "--page-size", "7"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/trademarks/123/office-actions",
+			wantQuery:  map[string]string{"page": "4", "page_size": "7"},
+		},
+		{
+			name:       "conflict action get escapes IDs",
+			args:       []string{"portfolio", "actions", "conflict", "get", "tm/123", "action/456"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/trademarks/tm%2F123/conflict-actions/action%2F456",
+		},
+		{
+			name:       "office status includes zero",
+			args:       []string{"portfolio", "actions", "office", "status", "123", "456", "--status", "0", "--note", "reviewed"},
+			wantMethod: http.MethodPut,
+			wantPath:   "/api/v1/portfolio/trademarks/123/office-actions/456/status",
+			wantBody: func(t *testing.T, body map[string]any) {
+				if body["status"] != float64(0) || body["note"] != "reviewed" {
+					t.Fatalf("body mismatch: %#v", body)
+				}
+			},
+		},
+		{
+			name:       "cbp service requests",
+			args:       []string{"portfolio", "actions", "cbp", "service-requests"},
+			wantMethod: http.MethodGet,
+			wantPath:   "/api/v1/portfolio/actions/cbp/service-requests",
+		},
+		{
+			name:       "cbp submit service request",
+			args:       []string{"portfolio", "actions", "cbp", "submit", "--request-type", "renew", "--trademark-id", "tm1", "--serial-number", "90000001", "--port-of-entry", "LAX,SFO", "--contact-email", "ops@example.com"},
+			wantMethod: http.MethodPost,
+			wantPath:   "/api/v1/portfolio/actions/cbp/service-requests",
+			wantBody: func(t *testing.T, body map[string]any) {
+				if body["request_type"] != "renew" || body["trademark_id"] != "tm1" || body["serial_number"] != "90000001" || body["contact_email"] != "ops@example.com" {
+					t.Fatalf("body mismatch: %#v", body)
+				}
+				if !reflect.DeepEqual(body["ports_of_entry"], []any{"LAX", "SFO"}) {
+					t.Fatalf("ports mismatch: %#v", body["ports_of_entry"])
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotMethod string
+			var gotPath string
+			var gotQuery url.Values
+			var gotBody map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMethod = r.Method
+				gotPath = r.URL.EscapedPath()
+				gotQuery = r.URL.Query()
+				if r.Body != nil && r.ContentLength != 0 {
+					if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+						t.Fatalf("decode request body: %v", err)
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"ok":true}}`))
+			}))
+			defer server.Close()
+
+			t.Setenv("TMCOPILOT_HOME", t.TempDir())
+			t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+			cmd := NewRootCommand()
+			var stdout, stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+			}
+			if gotMethod != tt.wantMethod {
+				t.Fatalf("method = %q, want %q", gotMethod, tt.wantMethod)
+			}
+			if gotPath != tt.wantPath {
+				t.Fatalf("path = %q, want %q", gotPath, tt.wantPath)
+			}
+			for key, want := range tt.wantQuery {
+				if got := gotQuery.Get(key); got != want {
+					t.Fatalf("query %s = %q, want %q (all query=%s)", key, got, want, gotQuery.Encode())
+				}
+			}
+			if tt.wantBody != nil {
+				tt.wantBody(t, gotBody)
+			} else if gotBody != nil {
+				t.Fatalf("unexpected body: %#v", gotBody)
+			}
+		})
+	}
+}
+
+func TestPortfolioActionCommandsValidateRequiredFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "status requires status flag",
+			args: []string{"portfolio", "actions", "conflict", "status", "123", "456"},
+		},
+		{
+			name: "cbp submit requires request type",
+			args: []string{"portfolio", "actions", "cbp", "submit", "--trademark-id", "tm1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			t.Setenv("TMCOPILOT_HOME", t.TempDir())
+			t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+			cmd := NewRootCommand()
+			var stdout, stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err == nil {
+				t.Fatalf("command should fail")
+			}
+			if called {
+				t.Fatalf("API should not be called")
+			}
+		})
+	}
+}
+
+func TestPortfolioActionSchemaCommandsAreMapped(t *testing.T) {
+	commands := []string{
+		"portfolio actions office deadlines",
+		"portfolio actions office for-trademark",
+		"portfolio actions office get",
+		"portfolio actions office list",
+		"portfolio actions office status",
+		"portfolio actions conflict groups",
+		"portfolio actions conflict for-trademark",
+		"portfolio actions conflict get",
+		"portfolio actions conflict list",
+		"portfolio actions conflict status",
+		"portfolio actions cbp list",
+		"portfolio actions cbp service-requests",
+		"portfolio actions cbp submit",
+	}
+	for _, commandPath := range commands {
+		t.Run(commandPath, func(t *testing.T) {
+			args := append([]string{"--format", "json", "schema"}, strings.Fields(commandPath)...)
+			stdout, _ := executeRootCommand(t, args)
+			if !strings.Contains(stdout, `"coverage":"typed"`) {
+				t.Fatalf("schema output should include typed endpoint coverage: %s", stdout)
+			}
 		})
 	}
 }

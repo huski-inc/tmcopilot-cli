@@ -38,43 +38,9 @@ func newPortfolioCommand(opts *globalOptions) *cobra.Command {
 		Use:   "actions",
 		Short: "Work with portfolio action lists",
 	}
-	actions.AddCommand(newPagedListCommand(opts, listCommandSpec{
-		Use:   "office",
-		Short: "List portfolio office actions",
-		Path:  "/portfolio/actions/office",
-		Filters: []queryFlagSpec{
-			{Flag: "keyword", Param: "keyword", Description: "keyword filter"},
-			{Flag: "serial", Param: "serial", Description: "legacy serial filter"},
-			{Flag: "status", Param: "status", Description: "status filter"},
-		},
-	}))
-	actions.AddCommand(newPagedListCommand(opts, listCommandSpec{
-		Use:          "conflict",
-		Short:        "List portfolio conflict actions",
-		Path:         "/portfolio/actions/conflict",
-		SortParam:    "sort_field",
-		SortDirParam: "sort_dir",
-		Filters: []queryFlagSpec{
-			{Flag: "keyword", Param: "keyword", Description: "keyword filter"},
-			{Flag: "status", Param: "status", Description: "status filter"},
-			{Flag: "risk", Param: "risk", Description: "risk filter"},
-			{Flag: "jurisdiction", Param: "jurisdiction", Description: "jurisdiction filter"},
-			{Flag: "reviewed", Param: "reviewed", Description: "review filter"},
-			{Flag: "date-from", Param: "date_from", Description: "calendar range start timestamp"},
-			{Flag: "date-to", Param: "date_to", Description: "calendar range end timestamp"},
-		},
-	}))
-	actions.AddCommand(newPagedListCommand(opts, listCommandSpec{
-		Use:          "cbp",
-		Short:        "List portfolio CBP recordations",
-		Path:         "/portfolio/actions/cbp",
-		SortParam:    "sort_field",
-		SortDirParam: "sort_dir",
-		Filters: []queryFlagSpec{
-			{Flag: "keyword", Param: "keyword", Description: "keyword filter"},
-			{Flag: "status", Param: "status", Description: "status filter"},
-		},
-	}))
+	actions.AddCommand(newPortfolioOfficeActionsCommand(opts))
+	actions.AddCommand(newPortfolioConflictActionsCommand(opts))
+	actions.AddCommand(newPortfolioCBPActionsCommand(opts))
 	actions.AddCommand(newPortfolioSummaryCommand(opts, "office-summary", "Get portfolio office action summary", "/portfolio/actions/office/summary", nil))
 	actions.AddCommand(newPortfolioSummaryCommand(opts, "conflict-summary", "Get portfolio conflict action summary", "/portfolio/actions/conflict/summary", nil))
 	actions.AddCommand(newPortfolioSummaryCommand(opts, "cbp-summary", "Get portfolio CBP summary", "/portfolio/actions/cbp/summary", []queryFlagSpec{

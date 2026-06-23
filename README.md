@@ -280,8 +280,17 @@ tmc portfolio groups list --keyword nike
 tmc portfolio groups monitor-toggle <group-id> --monitor-type office_action --enable=true
 tmc portfolio monitored-summary
 tmc portfolio counts
-tmc portfolio actions office --keyword nike --status 1
-tmc portfolio actions conflict --risk high --sort due_date --sort-dir asc
+tmc portfolio actions office list --keyword nike --status 1
+tmc portfolio actions office deadlines --limit 10
+tmc portfolio actions office for-trademark <trademark-id>
+tmc portfolio actions office status <trademark-id> <action-id> --status 20 --note "Reviewed"
+tmc portfolio actions conflict list --risk high --sort due_date --sort-dir asc
+tmc portfolio actions conflict groups --risk high --group-by mark
+tmc portfolio actions conflict for-trademark <trademark-id>
+tmc portfolio actions conflict status <trademark-id> <action-id> --status 20
+tmc portfolio actions cbp list --status active
+tmc portfolio actions cbp service-requests
+tmc portfolio actions cbp submit --request-type renew --trademark-id <trademark-id>
 ```
 
 ### Competitors

@@ -333,6 +333,25 @@ func (r PortfolioUpdateTrademarkRequest) Empty() bool {
 		r.Text == ""
 }
 
+type PortfolioActionStatusUpdateRequest struct {
+	Status int    `json:"status"`
+	Note   string `json:"note,omitempty"`
+}
+
+type PortfolioCBPServiceRequestCreateRequest struct {
+	RequestType        string   `json:"request_type,omitempty"`
+	TrademarkID        string   `json:"trademark_id,omitempty"`
+	SerialNumber       string   `json:"serial_number,omitempty"`
+	RegistrationNumber string   `json:"registration_number,omitempty"`
+	RecordationNumber  string   `json:"recordation_number,omitempty"`
+	RecordationType    string   `json:"recordation_type,omitempty"`
+	MarkName           string   `json:"mark_name,omitempty"`
+	ContactName        string   `json:"contact_name,omitempty"`
+	ContactEmail       string   `json:"contact_email,omitempty"`
+	PortsOfEntry       []string `json:"ports_of_entry,omitempty"`
+	Notes              string   `json:"notes,omitempty"`
+}
+
 type PortfolioTrademarkMetadataRequest struct {
 	AttorneyName       string   `json:"attorney_name,omitempty"`
 	CBPStatus          string   `json:"cbp_status,omitempty"`

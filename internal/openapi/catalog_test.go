@@ -15,6 +15,10 @@ func TestGeneratedCatalogContainsTypedEndpoints(t *testing.T) {
 		{"GET", "/portfolio/trademarks/search"},
 		{"GET", "/competitors"},
 		{"POST", "/gap-analyses"},
+		{"POST", "/trademark/wide-table/lawsuits"},
+		{"GET", "/trademark/wide-table/lawsuits/{caseNumber}"},
+		{"GET", "/trademark/wide-table/lawyers/{graphId}"},
+		{"POST", "/trademark/wide-table/lawyers/{graphId}/trademarks"},
 	}
 	for _, tt := range tests {
 		endpoint, ok := FindEndpoint(tt.method, tt.path)

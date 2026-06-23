@@ -118,6 +118,9 @@ DISCOVERY:
   tmc agent bootstrap
   tmc search trademarks --name Nike --class 25,35 --limit 20
   tmc search owners --name "Nike"
+  tmc ttab search --plaintiff Nike --issue opposition
+  tmc lawsuits search --party Nike --trademark AIR
+  tmc lawyers search --name Smith --state CA --limit 20
   tmc portfolio trademarks list --page-all --format ndjson --output trademarks.ndjson
   tmc schema search trademarks
   tmc skills read tmc-trademark-search`,
@@ -150,6 +153,9 @@ DISCOVERY:
 	root.AddCommand(newCompetitorsCommand(opts))
 	root.AddCommand(newCommonLawCommand(opts))
 	root.AddCommand(newDomainCommand(opts))
+	root.AddCommand(newTTABCommand(opts))
+	root.AddCommand(newLawsuitCommand(opts))
+	root.AddCommand(newLawyersCommand(opts))
 	root.AddCommand(newSearchCommand(opts))
 	root.AddCommand(newGapCommand(opts))
 	root.AddCommand(newFilesCommand(opts))

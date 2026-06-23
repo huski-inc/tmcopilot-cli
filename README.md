@@ -6,8 +6,8 @@ The CLI can be invoked as either `tmc` or `tmcopilot`. `tmc` is the short comman
 
 Use it when you need to:
 
-- Search trademarks, owners, lawyers, Office Actions, and TTAB cases
-- Export portfolio trademarks, tasks, monitoring results, and competitor intelligence
+- Search trademarks, owners, lawyers, Office Actions, TTAB cases, and lawsuits
+- Export portfolio trademarks, monitoring results, and competitor intelligence
 - Create, run, and download Gap Analysis results
 - Let Claude Code, Codex, Cursor, and other agents call TMCopilot through stable commands
 - Use an API key from scripts or CI jobs
@@ -34,9 +34,10 @@ Install · Quick Start · Authentication · Features · Agent Skills · Output &
 | Lawyers and attorneys | Search lawyers / attorneys, rankings, and contact information |
 | Office Actions | Search Office Actions by mark, issue type, and related filters |
 | TTAB | Search TTAB cases and fetch cases by case number |
+| Lawsuits | Search lawsuit wide-table data and fetch lawsuit details by case number |
 | Common law and domains | Search app stores, ecommerce/social handles, web evidence, and domain names |
 | Trademark image search | Create image search tasks, inspect results, and download USPTO Office Action documents |
-| Portfolio | View portfolio trademarks, monitoring summaries, counts, activity, and tasks |
+| Portfolio | View portfolio trademarks, monitoring summaries, counts, and activity |
 | Portfolio Actions | Query Office Action, conflict, CBP, and other action lists |
 | Competitors | Query competitors, competitor activities, and reports |
 | Gap Analysis | Create, run, wait for, inspect, report on, and share gap analyses |
@@ -237,10 +238,15 @@ The update check cache is stored at `~/.tmcopilot/update-check.json`.
 tmc search trademarks --name Nike --class 25,35 --limit 20
 tmc search detail 97346091 --country US
 tmc search office-actions --mark Nike --issue-type likelihood_confusion
-tmc search ttab --plaintiff Nike --issue opposition
-tmc search ttab-case <case-number>
+tmc ttab search --plaintiff Nike --issue opposition
+tmc ttab case <case-number>
+tmc lawsuits search --party Nike --trademark AIR --limit 20
+tmc lawsuits get <case-number>
 tmc search owners --name "Nike"
-tmc search lawyers --name Smith --state CA
+tmc lawyers search --name Smith --state CA --limit 20
+tmc lawyers get <graph-id>
+tmc lawyers trademarks <graph-id> --limit 20
+tmc lawyers law-firms <graph-id> --sort-name asc
 tmc search image create --bucket tmc-images --key uploads/mark.png --country US,CA
 tmc search image result <task-id>
 tmc --output office-action.pdf search uspto-document --serial-number 97346091 --document-page-id <id> --document-type <type> --document-date <date>
@@ -276,7 +282,6 @@ tmc portfolio monitored-summary
 tmc portfolio counts
 tmc portfolio actions office --keyword nike --status 1
 tmc portfolio actions conflict --risk high --sort due_date --sort-dir asc
-tmc portfolio tasks list --status 1
 ```
 
 ### Competitors
@@ -420,7 +425,7 @@ The CLI embeds agent-readable usage guidance. Agents should read `tmc-shared` fi
 | Skill | Description |
 | --- | --- |
 | `tmc-shared` | Global authentication, output, safety, pagination, and command-selection rules |
-| `tmc-trademark-search` | Trademark, owner, lawyer, Office Action, and TTAB search |
+| `tmc-trademark-search` | Trademark, owner, lawyer, Office Action, TTAB, and lawsuit search |
 | `tmc-portfolio-export` | Portfolio lists, pagination, field selection, and export |
 | `tmc-gap-analysis` | Gap Analysis creation, execution, waiting, results, and reports |
 | `tmc-openapi` | API catalog, schema, and raw API usage |

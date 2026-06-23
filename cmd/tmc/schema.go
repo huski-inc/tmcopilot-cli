@@ -364,7 +364,16 @@ func isReadLikeCommand(key string, spec commandEndpointSpec) bool {
 		return true
 	}
 	switch spec.Path {
-	case "/trademark/detail", "/trademark/search", "/trademark/search/summary", "/trademark/office-action/search", "/trademark/ttab/search":
+	case "/trademark/detail",
+		"/trademark/search",
+		"/trademark/search/summary",
+		"/trademark/office-action/search",
+		"/trademark/ttab/search",
+		"/trademark/wide-table/lawsuits",
+		"/trademark/wide-table/brand-owners/{graphId}/lawsuits",
+		"/trademark/wide-table/lawyers/{graphId}/lawsuits",
+		"/trademark/wide-table/lawyers/{graphId}/law-firms",
+		"/trademark/wide-table/lawyers/{graphId}/trademarks":
 		return true
 	default:
 		return false
@@ -476,10 +485,6 @@ var commandEndpointSpecs = map[string]commandEndpointSpec{
 	"portfolio counts":                          {Method: "GET", Path: "/portfolio/trademarks/counts"},
 	"portfolio groups list":                     {Method: "GET", Path: "/portfolio/trademark-groups"},
 	"portfolio groups monitor-toggle":           {Method: "PUT", Path: "/portfolio/trademark-groups/{groupId}/monitor/toggle"},
-	"portfolio tasks get":                       {Method: "GET", Path: "/portfolio/tasks/{taskId}"},
-	"portfolio tasks latest-sync":               {Method: "GET", Path: "/portfolio/tasks/latest-sync"},
-	"portfolio tasks list":                      {Method: "GET", Path: "/portfolio/tasks"},
-	"portfolio tasks stats":                     {Method: "GET", Path: "/portfolio/tasks/stats"},
 	"portfolio trademarks get":                  {Method: "GET", Path: "/portfolio/trademarks/{trademarkId}"},
 	"portfolio trademarks import":               {Method: "POST", Path: "/portfolio/trademarks/import"},
 	"portfolio trademarks import-preview":       {Method: "POST", Path: "/portfolio/trademarks/import/preview"},
@@ -507,4 +512,19 @@ var commandEndpointSpecs = map[string]commandEndpointSpec{
 	"search ttab":                               {Method: "POST", Path: "/trademark/ttab/search"},
 	"search ttab-case":                          {Method: "GET", Path: "/trademark/ttab/{case_number}"},
 	"search uspto-document":                     {Method: "GET", Path: "/trademark/office-action/uspto/document"},
+	"search lawsuit":                            {Method: "GET", Path: "/trademark/wide-table/lawsuits/{caseNumber}"},
+	"search lawsuits":                           {Method: "POST", Path: "/trademark/wide-table/lawsuits"},
+	"ttab case":                                 {Method: "GET", Path: "/trademark/ttab/{case_number}"},
+	"ttab search":                               {Method: "POST", Path: "/trademark/ttab/search"},
+	"lawsuits brand-owner":                      {Method: "POST", Path: "/trademark/wide-table/brand-owners/{graphId}/lawsuits"},
+	"lawsuits get":                              {Method: "GET", Path: "/trademark/wide-table/lawsuits/{caseNumber}"},
+	"lawsuits lawyer":                           {Method: "POST", Path: "/trademark/wide-table/lawyers/{graphId}/lawsuits"},
+	"lawsuits search":                           {Method: "POST", Path: "/trademark/wide-table/lawsuits"},
+	"lawyers contact":                           {Method: "GET", Path: "/trademark/lawyer/contact"},
+	"lawyers get":                               {Method: "GET", Path: "/trademark/wide-table/lawyers/{graphId}"},
+	"lawyers law-firms":                         {Method: "POST", Path: "/trademark/wide-table/lawyers/{graphId}/law-firms"},
+	"lawyers lawsuits":                          {Method: "POST", Path: "/trademark/wide-table/lawyers/{graphId}/lawsuits"},
+	"lawyers ranking":                           {Method: "GET", Path: "/trademark/lawyer/ranking"},
+	"lawyers search":                            {Method: "GET", Path: "/trademark/lawyer/search"},
+	"lawyers trademarks":                        {Method: "POST", Path: "/trademark/wide-table/lawyers/{graphId}/trademarks"},
 }

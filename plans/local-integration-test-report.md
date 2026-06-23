@@ -57,7 +57,6 @@ Result: passed. The created API key was revoked.
 - `tmc portfolio actions conflict --page 1 --page-size 5`
 - `tmc portfolio actions cbp --page 1 --page-size 5`
 - `tmc portfolio activity list --page 1 --page-size 5`
-- `tmc portfolio tasks list --page 1 --page-size 5`
 
 Result: passed.
 

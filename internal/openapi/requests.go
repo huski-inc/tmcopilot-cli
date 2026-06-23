@@ -125,6 +125,89 @@ func (r TTABSearchRequest) Empty() bool {
 		len(r.CaseIssue) == 0
 }
 
+type LawsuitSearchRequest struct {
+	CaseAt                    []string `json:"case_at,omitempty"`
+	CaseClosedAt              []string `json:"case_closed_at,omitempty"`
+	CaseName                  []string `json:"case_name,omitempty"`
+	CaseNumberCode            []string `json:"case_number_code,omitempty"`
+	PartyName                 []string `json:"party_name,omitempty"`
+	PlaintiffName             []string `json:"plaintiff_name,omitempty"`
+	DefendantName             []string `json:"defendant_name,omitempty"`
+	LawyerName                []string `json:"lawyer_name,omitempty"`
+	LawFirmName               []string `json:"law_firm_name,omitempty"`
+	Trademark                 []string `json:"trademark,omitempty"`
+	UsageIdempotencyKey       string   `json:"usage_idempotency_key,omitempty"`
+	Limit                     int      `json:"limit,omitempty"`
+	Page                      int      `json:"page,omitempty"`
+	SortCaseAt                string   `json:"sort_case_at,omitempty"`
+	SortCaseName              string   `json:"sort_case_name,omitempty"`
+	SortCaseNumberCode        string   `json:"sort_case_number_code,omitempty"`
+	SortIndex                 string   `json:"sort_index,omitempty"`
+	SortLawFirmCount          string   `json:"sort_law_firm_count,omitempty"`
+	SortLawsuitDefendantCount string   `json:"sort_lawsuit_defendant_count,omitempty"`
+	SortLawsuitPlaintiffCount string   `json:"sort_lawsuit_plaintiff_count,omitempty"`
+	SortLawyerCount           string   `json:"sort_lawyer_count,omitempty"`
+}
+
+func (r LawsuitSearchRequest) Empty() bool {
+	return len(r.CaseAt) == 0 &&
+		len(r.CaseClosedAt) == 0 &&
+		len(r.CaseName) == 0 &&
+		len(r.CaseNumberCode) == 0 &&
+		len(r.PartyName) == 0 &&
+		len(r.PlaintiffName) == 0 &&
+		len(r.DefendantName) == 0 &&
+		len(r.LawyerName) == 0 &&
+		len(r.LawFirmName) == 0 &&
+		len(r.Trademark) == 0 &&
+		r.UsageIdempotencyKey == "" &&
+		r.Limit <= 0 &&
+		r.Page <= 0 &&
+		r.SortCaseAt == "" &&
+		r.SortCaseName == "" &&
+		r.SortCaseNumberCode == "" &&
+		r.SortIndex == "" &&
+		r.SortLawFirmCount == "" &&
+		r.SortLawsuitDefendantCount == "" &&
+		r.SortLawsuitPlaintiffCount == "" &&
+		r.SortLawyerCount == ""
+}
+
+type LawsuitListRequest struct {
+	Limit                     int    `json:"limit,omitempty"`
+	Page                      int    `json:"page,omitempty"`
+	SortCaseAt                string `json:"sort_case_at,omitempty"`
+	SortCaseName              string `json:"sort_case_name,omitempty"`
+	SortCaseNumberCode        string `json:"sort_case_number_code,omitempty"`
+	SortIndex                 string `json:"sort_index,omitempty"`
+	SortLawFirmCount          string `json:"sort_law_firm_count,omitempty"`
+	SortLawsuitDefendantCount string `json:"sort_lawsuit_defendant_count,omitempty"`
+	SortLawsuitPlaintiffCount string `json:"sort_lawsuit_plaintiff_count,omitempty"`
+	SortLawyerCount           string `json:"sort_lawyer_count,omitempty"`
+}
+
+type WideTableTrademarkListRequest struct {
+	Limit            int    `json:"limit,omitempty"`
+	Page             int    `json:"page,omitempty"`
+	Status           *int   `json:"status,omitempty"`
+	SortFilingAt     string `json:"sort_filing_at,omitempty"`
+	SortIndex        string `json:"sort_index,omitempty"`
+	SortLawsuitCount string `json:"sort_lawsuit_count,omitempty"`
+	SortMark         string `json:"sort_mark,omitempty"`
+	SortSerialNumber string `json:"sort_serial_number,omitempty"`
+	SortStatus       string `json:"sort_status,omitempty"`
+}
+
+type WideTableLawFirmListRequest struct {
+	Limit              int    `json:"limit,omitempty"`
+	Page               int    `json:"page,omitempty"`
+	SortName           string `json:"sort_name,omitempty"`
+	SortRank           string `json:"sort_rank,omitempty"`
+	SortTrademarkCount string `json:"sort_trademark_count,omitempty"`
+	SortLawsuitCount   string `json:"sort_lawsuit_count,omitempty"`
+	SortLawyerCount    string `json:"sort_lawyer_count,omitempty"`
+}
+
 type GapCreateRequest struct {
 	Title                 string   `json:"title,omitempty"`
 	BaseCompanyName       string   `json:"base_company_name,omitempty"`

@@ -100,48 +100,9 @@ func newPortfolioCommand(opts *globalOptions) *cobra.Command {
 	}))
 	cmd.AddCommand(activity)
 
-	tasks := &cobra.Command{
-		Use:   "tasks",
-		Short: "Work with portfolio tasks",
-	}
-	tasks.AddCommand(newPagedListCommand(opts, listCommandSpec{
-		Use:   "list",
-		Short: "List portfolio worker tasks",
-		Path:  "/portfolio/tasks",
-		Filters: []queryFlagSpec{
-			{Flag: "workspace-id", Param: "workspace_id", Description: "workspace ID filter"},
-			{Flag: "status", Param: "status", Description: "task status filter"},
-			{Flag: "task-type", Param: "task_type", Description: "task type filter"},
-			{Flag: "trademark-id", Param: "trademark_id", Description: "trademark ID filter"},
-			{Flag: "keyword", Param: "keyword", Description: "keyword filter"},
-		},
-	}))
-	tasks.AddCommand(newPortfolioSummaryCommand(opts, "latest-sync", "Get latest portfolio sync task", "/portfolio/tasks/latest-sync", []queryFlagSpec{
-		{Flag: "trademark-id", Param: "trademark_id", Description: "trademark ID filter"},
-		{Flag: "task-type", Param: "task_type", Description: "task type filter"},
-	}))
-	tasks.AddCommand(newPortfolioTaskGetCommand(opts))
-	tasks.AddCommand(newPortfolioSummaryCommand(opts, "stats", "Get portfolio task status counters", "/portfolio/tasks/stats", []queryFlagSpec{
-		{Flag: "workspace-id", Param: "workspace_id", Description: "workspace ID filter"},
-		{Flag: "trademark-id", Param: "trademark_id", Description: "trademark ID filter"},
-		{Flag: "keyword", Param: "keyword", Description: "keyword filter"},
-	}))
-	cmd.AddCommand(tasks)
-
 	cmd.AddCommand(newPortfolioSummaryCommand(opts, "counts", "Get portfolio trademark counts", "/portfolio/trademarks/counts", nil))
 	cmd.AddCommand(newPortfolioSummaryCommand(opts, "monitored-summary", "Get portfolio monitored summary", "/portfolio/trademarks/monitored/summary", nil))
 	return cmd
-}
-
-func newPortfolioTaskGetCommand(opts *globalOptions) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <task-id>",
-		Short: "Get a portfolio worker task",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return callAPIAndWrite(cmd, opts, "GET", "/portfolio/tasks/"+url.PathEscape(args[0]), nil, nil)
-		},
-	}
 }
 
 func newPortfolioTrademarksListCommand(opts *globalOptions) *cobra.Command {

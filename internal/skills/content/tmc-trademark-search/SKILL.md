@@ -1,13 +1,13 @@
 ---
 name: tmc-trademark-search
-version: 1.1.0
-description: "Trademark, office action, TTAB, lawyer, and company/owner search commands for TMCopilot."
-cliHelp: "tmc search --help"
+version: 1.3.0
+description: "Trademark, office action, TTAB, lawsuit, lawyer, and company/owner search commands for TMCopilot."
+cliHelp: "tmc search --help; tmc lawsuits --help; tmc lawyers --help"
 ---
 
 # tmc-trademark-search
 
-Use this skill when the user asks to search trademarks, office action cases, TTAB cases, lawyers, or companies/owners.
+Use this skill when the user asks to search trademarks, office action cases, TTAB cases, lawsuits, lawyers, or companies/owners.
 
 ## Commands
 
@@ -17,12 +17,19 @@ Use this skill when the user asks to search trademarks, office action cases, TTA
 | Trademark search alias | `tmc search trademark` |
 | Trademark detail | `tmc search detail` |
 | Office action / case search | `tmc search office-actions` |
-| TTAB case search | `tmc search ttab` |
-| TTAB case detail | `tmc search ttab-case` |
-| Lawyer search | `tmc search lawyers` |
-| Attorney search alias | `tmc search attorneys` |
-| Lawyer ranking | `tmc search lawyer-ranking` |
-| Lawyer contact | `tmc search lawyer-contact` |
+| TTAB case search | `tmc ttab search` or `tmc search ttab` |
+| TTAB case detail | `tmc ttab case` or `tmc search ttab-case` |
+| Lawsuit search | `tmc lawsuits search` or `tmc search lawsuits` |
+| Lawsuit detail | `tmc lawsuits get` or `tmc search lawsuit` |
+| Brand owner lawsuits | `tmc lawsuits brand-owner` |
+| Lawyer lawsuits | `tmc lawyers lawsuits` or `tmc lawsuits lawyer` |
+| Lawyer search | `tmc lawyers search` or `tmc search lawyers` |
+| Attorney search alias | `tmc attorneys search` or `tmc search attorneys` |
+| Lawyer ranking | `tmc lawyers ranking` or `tmc search lawyer-ranking` |
+| Lawyer contact | `tmc lawyers contact` or `tmc search lawyer-contact` |
+| Lawyer detail | `tmc lawyers get` |
+| Lawyer trademarks | `tmc lawyers trademarks` |
+| Lawyer law firms | `tmc lawyers law-firms` |
 | Company / owner search | `tmc search owners` |
 | Company search alias | `tmc search companies` |
 | Owner ranking | `tmc search owner-ranking` |
@@ -57,13 +64,26 @@ tmc search office-actions --mark Nike --issue-type likelihood_confusion
 TTAB search:
 
 ```bash
-tmc search ttab --plaintiff Nike --issue opposition
+tmc ttab search --plaintiff Nike --issue opposition
+tmc ttab case <case-number>
+```
+
+Lawsuit search:
+
+```bash
+tmc lawsuits search --party Nike --trademark AIR --limit 20
+tmc lawsuits get <case-number>
+tmc lawsuits brand-owner <graph-id> --limit 20
+tmc lawsuits lawyer <graph-id> --sort-case-at desc
 ```
 
 Lawyer search:
 
 ```bash
-tmc search lawyers --name Smith --state CA --limit 20
+tmc lawyers search --name Smith --state CA --limit 20
+tmc lawyers get <graph-id>
+tmc lawyers trademarks <graph-id> --limit 20
+tmc lawyers law-firms <graph-id> --sort-name asc
 ```
 
 Company / owner search:
@@ -99,15 +119,9 @@ Schema inspection before raw API fallback:
 tmc schema search trademarks
 tmc schema search office-actions
 tmc schema search ttab
+tmc schema lawsuits search
+tmc schema lawyers search
 tmc schema common-law search social-handle
 tmc schema domain search
 tmc schema search image create
-```
-
-## Raw API Fallback
-
-If the user asks for lawsuit wide-table search, use raw API until a typed command exists:
-
-```bash
-tmc api POST /trademark/wide-table/lawsuits --data @request.json
 ```

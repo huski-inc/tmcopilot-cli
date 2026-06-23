@@ -14,6 +14,22 @@ import (
 	"github.com/huski-inc/tmcopilot-cli/internal/config"
 )
 
+func executeRootCommand(t *testing.T, args []string) (string, string) {
+	t.Helper()
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs(args)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	return stdout.String(), stderr.String()
+}
+
 func TestSearchTrademarksCommandBuildsOpenAPIRequest(t *testing.T) {
 	var gotBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +93,620 @@ func TestSearchTrademarksCommandBuildsOpenAPIRequest(t *testing.T) {
 	}
 	if output["ok"] != true {
 		t.Fatalf("output ok mismatch: %#v", output)
+	}
+}
+
+func TestTTABSearchCommandsBuildOpenAPIRequest(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		commandHeader string
+	}{
+		{
+			name:          "legacy search group",
+			args:          []string{"search", "ttab"},
+			commandHeader: "tmc search ttab",
+		},
+		{
+			name:          "ttab group",
+			args:          []string{"ttab", "search"},
+			commandHeader: "tmc ttab search",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotBody map[string]any
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != "/api/v1/trademark/ttab/search" {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+					t.Fatalf("decode request body: %v", err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"list":[],"total":0}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{
+				"--endpoint", server.URL,
+			}, tt.args...)
+			args = append(args,
+				"--case-number", "91234567",
+				"--case-type", "opposition",
+				"--plaintiff", "Nike",
+				"--defendant", "Adidas",
+				"--lawyer", "Smith",
+				"--law-firm", "Example LLP",
+				"--citable", "y",
+				"--mark", "AIR",
+				"--serial", "97346091",
+				"--registration", "1234567",
+				"--filing-date-start", "2024-01-01",
+				"--filing-date-end", "2024-12-31",
+				"--issue", "opposition,cancellation",
+				"--issue", "expungement",
+				"--sort-filing-date", "desc",
+				"--sort-event-date", "asc",
+			)
+
+			executeRootCommand(t, args)
+
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+			for key, want := range map[string]string{
+				"case_number":            "91234567",
+				"case_type":              "opposition",
+				"case_plaintiff":         "Nike",
+				"case_defendant":         "Adidas",
+				"case_lawyer":            "Smith",
+				"case_law_firm":          "Example LLP",
+				"case_citable":           "y",
+				"tm_mark":                "AIR",
+				"tm_serial_number":       "97346091",
+				"tm_registration_number": "1234567",
+				"case_filing_date_start": "2024-01-01",
+				"case_filing_date_end":   "2024-12-31",
+				"sort_case_filing_date":  "desc",
+				"sort_case_event_date":   "asc",
+			} {
+				if gotBody[key] != want {
+					t.Fatalf("%s body mismatch: got %#v want %q; body=%#v", key, gotBody[key], want, gotBody)
+				}
+			}
+			if !reflect.DeepEqual(gotBody["case_issue"], []any{"opposition", "cancellation", "expungement"}) {
+				t.Fatalf("case_issue body mismatch: %#v", gotBody["case_issue"])
+			}
+		})
+	}
+}
+
+func TestTTABCaseCommandsFetchByNumber(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		commandHeader string
+	}{
+		{
+			name:          "legacy search group",
+			args:          []string{"search", "ttab-case", "91234567"},
+			commandHeader: "tmc search ttab-case",
+		},
+		{
+			name:          "ttab group",
+			args:          []string{"ttab", "case", "91234567"},
+			commandHeader: "tmc ttab case",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != "/api/v1/trademark/ttab/91234567" {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"number":"91234567"}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			executeRootCommand(t, args)
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+		})
+	}
+}
+
+func TestLawsuitSearchCommandsBuildOpenAPIRequest(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		commandHeader string
+	}{
+		{
+			name:          "legacy search group",
+			args:          []string{"search", "lawsuits"},
+			commandHeader: "tmc search lawsuits",
+		},
+		{
+			name:          "lawsuits group",
+			args:          []string{"lawsuits", "search"},
+			commandHeader: "tmc lawsuits search",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotBody map[string]any
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != "/api/v1/trademark/wide-table/lawsuits" {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+					t.Fatalf("decode request body: %v", err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"list":[],"total":0}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{
+				"--endpoint", server.URL,
+			}, tt.args...)
+			args = append(args,
+				"--case-at", "2024-01-01",
+				"--case-closed-at", "2024-12-31",
+				"--case-name", "Nike v Adidas,Nike v Puma",
+				"--case-number-code", "1:24-cv-123",
+				"--party", "Nike",
+				"--plaintiff", "Nike Inc",
+				"--defendant", "Adidas AG",
+				"--lawyer", "Smith",
+				"--law-firm", "Example LLP",
+				"--trademark", "AIR,97346091",
+				"--usage-idempotency-key", "usage_1",
+				"--limit", "25",
+				"--page", "2",
+				"--sort-case-at", "desc",
+				"--sort-case-name", "asc",
+				"--sort-case-number-code", "desc",
+				"--sort-index", "asc",
+				"--sort-law-firm-count", "desc",
+				"--sort-lawsuit-defendant-count", "asc",
+				"--sort-lawsuit-plaintiff-count", "desc",
+				"--sort-lawyer-count", "asc",
+			)
+
+			executeRootCommand(t, args)
+
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+			for key, want := range map[string][]any{
+				"case_at":          {"2024-01-01"},
+				"case_closed_at":   {"2024-12-31"},
+				"case_name":        {"Nike v Adidas", "Nike v Puma"},
+				"case_number_code": {"1:24-cv-123"},
+				"party_name":       {"Nike"},
+				"plaintiff_name":   {"Nike Inc"},
+				"defendant_name":   {"Adidas AG"},
+				"lawyer_name":      {"Smith"},
+				"law_firm_name":    {"Example LLP"},
+				"trademark":        {"AIR", "97346091"},
+			} {
+				if !reflect.DeepEqual(gotBody[key], want) {
+					t.Fatalf("%s body mismatch: got %#v want %#v; body=%#v", key, gotBody[key], want, gotBody)
+				}
+			}
+			for key, want := range map[string]string{
+				"usage_idempotency_key":        "usage_1",
+				"sort_case_at":                 "desc",
+				"sort_case_name":               "asc",
+				"sort_case_number_code":        "desc",
+				"sort_index":                   "asc",
+				"sort_law_firm_count":          "desc",
+				"sort_lawsuit_defendant_count": "asc",
+				"sort_lawsuit_plaintiff_count": "desc",
+				"sort_lawyer_count":            "asc",
+			} {
+				if gotBody[key] != want {
+					t.Fatalf("%s body mismatch: got %#v want %q; body=%#v", key, gotBody[key], want, gotBody)
+				}
+			}
+			if gotBody["limit"] != float64(25) || gotBody["page"] != float64(2) {
+				t.Fatalf("pagination body mismatch: %#v", gotBody)
+			}
+		})
+	}
+}
+
+func TestLawsuitGetCommandsFetchByCaseNumber(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		commandHeader string
+	}{
+		{
+			name:          "legacy search group",
+			args:          []string{"search", "lawsuit", "CASE123"},
+			commandHeader: "tmc search lawsuit",
+		},
+		{
+			name:          "lawsuits group",
+			args:          []string{"lawsuits", "get", "CASE123"},
+			commandHeader: "tmc lawsuits get",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != "/api/v1/trademark/wide-table/lawsuits/CASE123" {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"case_number":"CASE123"}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			executeRootCommand(t, args)
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+		})
+	}
+}
+
+func TestLawsuitRelatedCommandsBuildOpenAPIRequest(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		path          string
+		commandHeader string
+	}{
+		{
+			name:          "brand owner lawsuits",
+			args:          []string{"lawsuits", "brand-owner", "owner_graph_1"},
+			path:          "/api/v1/trademark/wide-table/brand-owners/owner_graph_1/lawsuits",
+			commandHeader: "tmc lawsuits brand-owner",
+		},
+		{
+			name:          "lawyer lawsuits",
+			args:          []string{"lawsuits", "lawyer", "lawyer_graph_1"},
+			path:          "/api/v1/trademark/wide-table/lawyers/lawyer_graph_1/lawsuits",
+			commandHeader: "tmc lawsuits lawyer",
+		},
+		{
+			name:          "lawyers group lawsuits",
+			args:          []string{"lawyers", "lawsuits", "lawyer_graph_1"},
+			path:          "/api/v1/trademark/wide-table/lawyers/lawyer_graph_1/lawsuits",
+			commandHeader: "tmc lawyers lawsuits",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotBody map[string]any
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != tt.path {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+					t.Fatalf("decode request body: %v", err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"list":[],"total":0}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			args = append(args,
+				"--limit", "10",
+				"--page", "3",
+				"--sort-case-at", "asc",
+				"--sort-lawyer-count", "desc",
+			)
+			executeRootCommand(t, args)
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+			if gotBody["limit"] != float64(10) || gotBody["page"] != float64(3) {
+				t.Fatalf("pagination body mismatch: %#v", gotBody)
+			}
+			if gotBody["sort_case_at"] != "asc" || gotBody["sort_lawyer_count"] != "desc" {
+				t.Fatalf("sort body mismatch: %#v", gotBody)
+			}
+		})
+	}
+}
+
+func TestLawyerSearchCommandsBuildQuery(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		commandHeader string
+	}{
+		{
+			name:          "legacy search group",
+			args:          []string{"search", "lawyers"},
+			commandHeader: "tmc search lawyers",
+		},
+		{
+			name:          "lawyers group",
+			args:          []string{"lawyers", "search"},
+			commandHeader: "tmc lawyers search",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != "/api/v1/trademark/lawyer/search" {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				query := r.URL.Query()
+				for key, want := range map[string]string{
+					"name":          "Smith",
+					"city":          "San Francisco",
+					"state":         "CA",
+					"zip_code":      "94105",
+					"email_name":    "sarah",
+					"email_domain":  "example.com",
+					"email_address": "sarah@example.com",
+					"page":          "2",
+					"limit":         "25",
+				} {
+					if got := query.Get(key); got != want {
+						t.Fatalf("query %s = %q, want %q", key, got, want)
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"list":[],"total":0}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			args = append(args,
+				"--name", "Smith",
+				"--city", "San Francisco",
+				"--state", "CA",
+				"--zip-code", "94105",
+				"--email-name", "sarah",
+				"--email-domain", "example.com",
+				"--email-address", "sarah@example.com",
+				"--page", "2",
+				"--limit", "25",
+			)
+			executeRootCommand(t, args)
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+		})
+	}
+}
+
+func TestLawyerRankingAndContactCommands(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		path          string
+		query         map[string]string
+		commandHeader string
+	}{
+		{
+			name:          "legacy ranking",
+			args:          []string{"search", "lawyer-ranking", "--type", "combined_metrics", "--limit", "10"},
+			path:          "/api/v1/trademark/lawyer/ranking",
+			query:         map[string]string{"type": "combined_metrics", "limit": "10"},
+			commandHeader: "tmc search lawyer-ranking",
+		},
+		{
+			name:          "top-level ranking",
+			args:          []string{"lawyers", "ranking", "--type", "combined_metrics", "--limit", "10"},
+			path:          "/api/v1/trademark/lawyer/ranking",
+			query:         map[string]string{"type": "combined_metrics", "limit": "10"},
+			commandHeader: "tmc lawyers ranking",
+		},
+		{
+			name:          "legacy contact",
+			args:          []string{"search", "lawyer-contact", "--name", "Sarah Smith"},
+			path:          "/api/v1/trademark/lawyer/contact",
+			query:         map[string]string{"name": "Sarah Smith"},
+			commandHeader: "tmc search lawyer-contact",
+		},
+		{
+			name:          "top-level contact",
+			args:          []string{"lawyers", "contact", "--name", "Sarah Smith"},
+			path:          "/api/v1/trademark/lawyer/contact",
+			query:         map[string]string{"name": "Sarah Smith"},
+			commandHeader: "tmc lawyers contact",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != tt.path {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				query := r.URL.Query()
+				for key, want := range tt.query {
+					if got := query.Get(key); got != want {
+						t.Fatalf("query %s = %q, want %q", key, got, want)
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			executeRootCommand(t, args)
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+		})
+	}
+}
+
+func TestLawyerWideTableCommandsBuildOpenAPIRequest(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		method        string
+		path          string
+		commandHeader string
+		wantBody      map[string]any
+	}{
+		{
+			name:          "get lawyer info",
+			args:          []string{"lawyers", "get", "lawyer_graph_1"},
+			method:        http.MethodGet,
+			path:          "/api/v1/trademark/wide-table/lawyers/lawyer_graph_1",
+			commandHeader: "tmc lawyers get",
+		},
+		{
+			name: "list lawyer trademarks",
+			args: []string{
+				"lawyers", "trademarks", "lawyer_graph_1",
+				"--limit", "10",
+				"--page", "3",
+				"--status", "1",
+				"--sort-filing-at", "desc",
+				"--sort-index", "asc",
+				"--sort-lawsuit-count", "desc",
+				"--sort-mark", "asc",
+				"--sort-serial-number", "desc",
+				"--sort-status", "asc",
+			},
+			method:        http.MethodPost,
+			path:          "/api/v1/trademark/wide-table/lawyers/lawyer_graph_1/trademarks",
+			commandHeader: "tmc lawyers trademarks",
+			wantBody: map[string]any{
+				"limit":              float64(10),
+				"page":               float64(3),
+				"status":             float64(1),
+				"sort_filing_at":     "desc",
+				"sort_index":         "asc",
+				"sort_lawsuit_count": "desc",
+				"sort_mark":          "asc",
+				"sort_serial_number": "desc",
+				"sort_status":        "asc",
+			},
+		},
+		{
+			name: "list lawyer trademarks with status zero",
+			args: []string{
+				"lawyers", "trademarks", "lawyer_graph_1",
+				"--status", "0",
+			},
+			method:        http.MethodPost,
+			path:          "/api/v1/trademark/wide-table/lawyers/lawyer_graph_1/trademarks",
+			commandHeader: "tmc lawyers trademarks",
+			wantBody: map[string]any{
+				"status": float64(0),
+			},
+		},
+		{
+			name: "list lawyer law firms",
+			args: []string{
+				"lawyers", "law-firms", "lawyer_graph_1",
+				"--limit", "20",
+				"--page", "2",
+				"--sort-name", "asc",
+				"--sort-rank", "desc",
+				"--sort-trademark-count", "asc",
+				"--sort-lawsuit-count", "desc",
+				"--sort-lawyer-count", "asc",
+			},
+			method:        http.MethodPost,
+			path:          "/api/v1/trademark/wide-table/lawyers/lawyer_graph_1/law-firms",
+			commandHeader: "tmc lawyers law-firms",
+			wantBody: map[string]any{
+				"limit":                float64(20),
+				"page":                 float64(2),
+				"sort_name":            "asc",
+				"sort_rank":            "desc",
+				"sort_trademark_count": "asc",
+				"sort_lawsuit_count":   "desc",
+				"sort_lawyer_count":    "asc",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotBody map[string]any
+			var gotCommand string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != tt.method {
+					t.Fatalf("method mismatch: %s", r.Method)
+				}
+				if r.URL.Path != tt.path {
+					t.Fatalf("path mismatch: %s", r.URL.Path)
+				}
+				gotCommand = r.Header.Get("X-TMCopilot-CLI-Command")
+				if tt.wantBody != nil {
+					if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+						t.Fatalf("decode request body: %v", err)
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{}}`))
+			}))
+			defer server.Close()
+
+			args := append([]string{"--endpoint", server.URL}, tt.args...)
+			executeRootCommand(t, args)
+			if gotCommand != tt.commandHeader {
+				t.Fatalf("command header = %q, want %q", gotCommand, tt.commandHeader)
+			}
+			for key, want := range tt.wantBody {
+				if gotBody[key] != want {
+					t.Fatalf("%s body mismatch: got %#v want %#v; body=%#v", key, gotBody[key], want, gotBody)
+				}
+			}
+		})
 	}
 }
 
@@ -1241,6 +1871,32 @@ func TestPortfolioMonitorCommandsBuildOpenAPIRequests(t *testing.T) {
 	}
 }
 
+func TestPortfolioTasksCommandsAreNotExposed(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"portfolio", "--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("portfolio help failed: %v stderr=%s", err, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "tasks") {
+		t.Fatalf("portfolio help should not expose tasks command: %s", stdout.String())
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "portfolio", "tasks", "list"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatalf("schema portfolio tasks list should fail after tasks commands are removed")
+	}
+}
+
 func TestDryRunDoesNotCallAPIAndWritesRequestOut(t *testing.T) {
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1920,12 +2576,131 @@ func TestNewSearchSchemasExposeSafetyAndTypedCoverage(t *testing.T) {
 	stderr.Reset()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "ttab", "search"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("ttab schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var ttabSchema struct {
+		Data struct {
+			Endpoint struct {
+				Coverage string `json:"coverage"`
+				Path     string `json:"path"`
+			} `json:"endpoint"`
+			Safety struct {
+				ReadOnly   bool `json:"read_only"`
+				SideEffect bool `json:"side_effect"`
+			} `json:"safety"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &ttabSchema); err != nil {
+		t.Fatalf("decode ttab schema: %v output=%s", err, stdout.String())
+	}
+	if ttabSchema.Data.Endpoint.Path != "/trademark/ttab/search" || ttabSchema.Data.Endpoint.Coverage != "typed" {
+		t.Fatalf("ttab endpoint metadata mismatch: %#v", ttabSchema.Data.Endpoint)
+	}
+	if !ttabSchema.Data.Safety.ReadOnly || ttabSchema.Data.Safety.SideEffect {
+		t.Fatalf("ttab safety mismatch: %#v", ttabSchema.Data.Safety)
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "lawsuits", "search"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("lawsuit schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var lawsuitSchema struct {
+		Data struct {
+			Endpoint struct {
+				Coverage string `json:"coverage"`
+				Path     string `json:"path"`
+			} `json:"endpoint"`
+			Safety struct {
+				ReadOnly   bool `json:"read_only"`
+				SideEffect bool `json:"side_effect"`
+			} `json:"safety"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &lawsuitSchema); err != nil {
+		t.Fatalf("decode lawsuit schema: %v output=%s", err, stdout.String())
+	}
+	if lawsuitSchema.Data.Endpoint.Path != "/trademark/wide-table/lawsuits" || lawsuitSchema.Data.Endpoint.Coverage != "typed" {
+		t.Fatalf("lawsuit endpoint metadata mismatch: %#v", lawsuitSchema.Data.Endpoint)
+	}
+	if !lawsuitSchema.Data.Safety.ReadOnly || lawsuitSchema.Data.Safety.SideEffect {
+		t.Fatalf("lawsuit safety mismatch: %#v", lawsuitSchema.Data.Safety)
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "lawyers", "trademarks"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("lawyer schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var lawyerSchema struct {
+		Data struct {
+			Endpoint struct {
+				Coverage string `json:"coverage"`
+				Path     string `json:"path"`
+			} `json:"endpoint"`
+			Safety struct {
+				ReadOnly   bool `json:"read_only"`
+				SideEffect bool `json:"side_effect"`
+			} `json:"safety"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &lawyerSchema); err != nil {
+		t.Fatalf("decode lawyer schema: %v output=%s", err, stdout.String())
+	}
+	if lawyerSchema.Data.Endpoint.Path != "/trademark/wide-table/lawyers/{graphId}/trademarks" || lawyerSchema.Data.Endpoint.Coverage != "typed" {
+		t.Fatalf("lawyer endpoint metadata mismatch: %#v", lawyerSchema.Data.Endpoint)
+	}
+	if !lawyerSchema.Data.Safety.ReadOnly || lawyerSchema.Data.Safety.SideEffect {
+		t.Fatalf("lawyer safety mismatch: %#v", lawyerSchema.Data.Safety)
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{"api", "catalog", "--coverage", "typed", "--search", "common-law"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("catalog failed: %v stderr=%s", err, stderr.String())
 	}
 	if !bytes.Contains(stdout.Bytes(), []byte(`/common-law/search/app-store`)) {
 		t.Fatalf("catalog missing common-law typed endpoint: %s", stdout.String())
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"api", "catalog", "--coverage", "typed", "--search", "lawsuit"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("lawsuit catalog failed: %v stderr=%s", err, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`/trademark/wide-table/lawsuits`)) {
+		t.Fatalf("catalog missing lawsuit typed endpoint: %s", stdout.String())
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"api", "catalog", "--coverage", "typed", "--search", "lawyer"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("lawyer catalog failed: %v stderr=%s", err, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`/trademark/wide-table/lawyers/{graphId}/trademarks`)) {
+		t.Fatalf("catalog missing lawyer typed endpoint: %s", stdout.String())
 	}
 }
 

@@ -1,7 +1,7 @@
 ---
 name: tmc-portfolio-export
 version: 1.1.0
-description: "Portfolio list, monitored trademarks, tasks, competitor lists, and large-result export patterns."
+description: "Portfolio list, monitored trademarks, competitor lists, and large-result export patterns."
 cliHelp: "tmc portfolio --help"
 ---
 
@@ -29,8 +29,6 @@ tmc portfolio counts
 tmc portfolio actions office --keyword nike
 tmc portfolio actions conflict --risk high
 tmc portfolio activity list --keyword nike
-tmc portfolio tasks list --status 1
-tmc portfolio tasks get <task-id>
 ```
 
 ## Competitor Commands

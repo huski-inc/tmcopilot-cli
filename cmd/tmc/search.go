@@ -22,6 +22,8 @@ func newSearchCommand(opts *globalOptions) *cobra.Command {
 	cmd.AddCommand(newOfficeActionSearchCommand(opts))
 	cmd.AddCommand(newTTABSearchCommand(opts))
 	cmd.AddCommand(newTTABCaseCommand(opts))
+	cmd.AddCommand(newLawsuitSearchLegacyCommand(opts))
+	cmd.AddCommand(newLawsuitGetLegacyCommand(opts))
 	cmd.AddCommand(newOwnerSearchCommand(opts))
 	cmd.AddCommand(newOwnerRankingCommand(opts))
 	cmd.AddCommand(newLawyerSearchCommand(opts))
@@ -31,6 +33,16 @@ func newSearchCommand(opts *globalOptions) *cobra.Command {
 	cmd.AddCommand(newSearchSummaryCommand(opts))
 	cmd.AddCommand(newTrademarkImageCommand(opts))
 	cmd.AddCommand(newUSPTOOfficeActionDocumentCommand(opts))
+	return cmd
+}
+
+func newTTABCommand(opts *globalOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "ttab",
+		Short: "Search and fetch TTAB cases",
+	}
+	cmd.AddCommand(newTTABSearchSubcommand(opts))
+	cmd.AddCommand(newTTABCaseSubcommand(opts))
 	return cmd
 }
 
@@ -213,14 +225,22 @@ func newOfficeActionSearchCommand(opts *globalOptions) *cobra.Command {
 }
 
 func newTTABSearchCommand(opts *globalOptions) *cobra.Command {
+	return newTTABSearchCommandFor(opts, "ttab", []string{"ttab-cases"})
+}
+
+func newTTABSearchSubcommand(opts *globalOptions) *cobra.Command {
+	return newTTABSearchCommandFor(opts, "search", []string{"cases"})
+}
+
+func newTTABSearchCommandFor(opts *globalOptions, use string, aliases []string) *cobra.Command {
 	var data string
 	var caseNumber, caseType, plaintiff, defendant, lawyer, lawFirm, citable string
 	var mark, serial, registration, filingStart, filingEnd string
 	var issues []string
 	var sortFilingDate, sortEventDate string
 	cmd := &cobra.Command{
-		Use:     "ttab",
-		Aliases: []string{"ttab-cases"},
+		Use:     use,
+		Aliases: aliases,
 		Short:   "Search TTAB cases",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			body, err := bodyFromDataOrBuilder(data, func() (any, error) {
@@ -272,10 +292,19 @@ func newTTABSearchCommand(opts *globalOptions) *cobra.Command {
 }
 
 func newTTABCaseCommand(opts *globalOptions) *cobra.Command {
+	return newTTABCaseCommandFor(opts, "ttab-case <case-number>", nil)
+}
+
+func newTTABCaseSubcommand(opts *globalOptions) *cobra.Command {
+	return newTTABCaseCommandFor(opts, "case <case-number>", []string{"get", "detail"})
+}
+
+func newTTABCaseCommandFor(opts *globalOptions, use string, aliases []string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "ttab-case <case-number>",
-		Short: "Get a TTAB case by case number",
-		Args:  cobra.ExactArgs(1),
+		Use:     use,
+		Aliases: aliases,
+		Short:   "Get a TTAB case by case number",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return callAPIAndWrite(cmd, opts, http.MethodGet, "/trademark/ttab/"+url.PathEscape(args[0]), nil, nil)
 		},
@@ -326,87 +355,6 @@ func newOwnerRankingCommand(opts *globalOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&limit, "limit", 0, "max number of results")
-	return cmd
-}
-
-func newLawyerSearchCommand(opts *globalOptions) *cobra.Command {
-	var name, city, state, zipCode, emailName, emailDomain, emailAddress string
-	var page int
-	var limit int
-	cmd := &cobra.Command{
-		Use:     "lawyers",
-		Aliases: []string{"attorneys", "attorney", "lawyer"},
-		Short:   "Search trademark lawyers and attorneys",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			query := url.Values{}
-			setQuery(query, "name", name)
-			setQuery(query, "city", city)
-			setQuery(query, "state", state)
-			setQuery(query, "zip_code", zipCode)
-			setQuery(query, "email_name", emailName)
-			setQuery(query, "email_domain", emailDomain)
-			setQuery(query, "email_address", emailAddress)
-			if page > 0 {
-				query.Set("page", strconv.Itoa(page))
-			}
-			if limit > 0 {
-				query.Set("limit", strconv.Itoa(limit))
-			}
-			if len(query) == 0 {
-				return fmt.Errorf("at least one lawyer search flag is required")
-			}
-			return callAPIAndWrite(cmd, opts, http.MethodGet, "/trademark/lawyer/search", query, nil)
-		},
-	}
-	cmd.Flags().StringVar(&name, "name", "", "lawyer name to search")
-	cmd.Flags().StringVar(&city, "city", "", "correspondent city filter")
-	cmd.Flags().StringVar(&state, "state", "", "correspondent state filter")
-	cmd.Flags().StringVar(&zipCode, "zip-code", "", "correspondent ZIP code filter")
-	cmd.Flags().StringVar(&emailName, "email-name", "", "email local-part filter")
-	cmd.Flags().StringVar(&emailDomain, "email-domain", "", "email domain filter")
-	cmd.Flags().StringVar(&emailAddress, "email-address", "", "exact email address filter")
-	cmd.Flags().IntVar(&page, "page", 0, "page number")
-	cmd.Flags().IntVar(&limit, "limit", 0, "items per page")
-	return cmd
-}
-
-func newLawyerRankingCommand(opts *globalOptions) *cobra.Command {
-	var rankingType string
-	var limit int
-	cmd := &cobra.Command{
-		Use:     "lawyer-ranking",
-		Aliases: []string{"attorney-ranking"},
-		Short:   "Get trademark lawyer ranking",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			query := url.Values{}
-			setQuery(query, "type", rankingType)
-			if limit > 0 {
-				query.Set("limit", strconv.Itoa(limit))
-			}
-			return callAPIAndWrite(cmd, opts, http.MethodGet, "/trademark/lawyer/ranking", query, nil)
-		},
-	}
-	cmd.Flags().StringVar(&rankingType, "type", "", "ranking type")
-	cmd.Flags().IntVar(&limit, "limit", 0, "max number of results")
-	return cmd
-}
-
-func newLawyerContactCommand(opts *globalOptions) *cobra.Command {
-	var name string
-	cmd := &cobra.Command{
-		Use:     "lawyer-contact",
-		Aliases: []string{"attorney-contact"},
-		Short:   "Get lawyer contact information",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if strings.TrimSpace(name) == "" {
-				return fmt.Errorf("--name is required")
-			}
-			query := url.Values{}
-			query.Set("name", name)
-			return callAPIAndWrite(cmd, opts, http.MethodGet, "/trademark/lawyer/contact", query, nil)
-		},
-	}
-	cmd.Flags().StringVar(&name, "name", "", "lawyer name exact match")
 	return cmd
 }
 

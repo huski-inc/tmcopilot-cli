@@ -94,10 +94,10 @@
 | raw | GET | `/portfolio/actions/office/deadlines` | portfolio-action | Get upcoming deadlines |
 | typed | GET | `/portfolio/actions/office/summary` | portfolio-action | Get office action summary |
 | typed | GET | `/portfolio/activity` | portfolio-action | List portfolio activity |
-| typed | GET | `/portfolio/tasks` | portfolio-task | List portfolio worker tasks |
-| typed | GET | `/portfolio/tasks/latest-sync` | portfolio-task | Get latest portfolio task sync |
-| typed | GET | `/portfolio/tasks/stats` | portfolio-task | Get portfolio task stats |
-| typed | GET | `/portfolio/tasks/{taskId}` | portfolio-task | Get portfolio worker task |
+| raw | GET | `/portfolio/tasks` | portfolio-task | List portfolio worker tasks |
+| raw | GET | `/portfolio/tasks/latest-sync` | portfolio-task | Get latest portfolio task sync |
+| raw | GET | `/portfolio/tasks/stats` | portfolio-task | Get portfolio task stats |
+| raw | GET | `/portfolio/tasks/{taskId}` | portfolio-task | Get portfolio worker task |
 | typed | GET | `/portfolio/trademark-groups` | portfolio-trademark | List trademark groups |
 | typed | PUT | `/portfolio/trademark-groups/{groupId}/monitor/toggle` | portfolio-trademark | Toggle trademark group monitor type |
 | typed | PUT | `/portfolio/trademark-monitor` | portfolio-trademark | Batch update monitor config |
@@ -146,12 +146,12 @@
 | typed | GET | `/trademark/ttab/{case_number}` | trademark | Get TTAB case details |
 | raw | GET | `/trademark/wide-table/brand-owners/{graphId}` | trademark | Get brand owner info |
 | raw | POST | `/trademark/wide-table/brand-owners/{graphId}/law-firms` | trademark | List brand owner law firms |
-| raw | POST | `/trademark/wide-table/brand-owners/{graphId}/lawsuits` | trademark | List brand owner lawsuits |
+| typed | POST | `/trademark/wide-table/brand-owners/{graphId}/lawsuits` | trademark | List brand owner lawsuits |
 | raw | POST | `/trademark/wide-table/brand-owners/{graphId}/trademarks` | trademark | List brand owner trademarks |
-| raw | POST | `/trademark/wide-table/lawsuits` | trademark | Search lawsuits |
-| raw | GET | `/trademark/wide-table/lawsuits/{caseNumber}` | trademark | Get lawsuit detail |
-| raw | GET | `/trademark/wide-table/lawyers/{graphId}` | trademark | Get lawyer info |
-| raw | POST | `/trademark/wide-table/lawyers/{graphId}/law-firms` | trademark | List lawyer law firms |
-| raw | POST | `/trademark/wide-table/lawyers/{graphId}/lawsuits` | trademark | List lawyer lawsuits |
-| raw | POST | `/trademark/wide-table/lawyers/{graphId}/trademarks` | trademark | List lawyer trademarks |
+| typed | POST | `/trademark/wide-table/lawsuits` | trademark | Search lawsuits |
+| typed | GET | `/trademark/wide-table/lawsuits/{caseNumber}` | trademark | Get lawsuit detail |
+| typed | GET | `/trademark/wide-table/lawyers/{graphId}` | trademark | Get lawyer info |
+| typed | POST | `/trademark/wide-table/lawyers/{graphId}/law-firms` | trademark | List lawyer law firms |
+| typed | POST | `/trademark/wide-table/lawyers/{graphId}/lawsuits` | trademark | List lawyer lawsuits |
+| typed | POST | `/trademark/wide-table/lawyers/{graphId}/trademarks` | trademark | List lawyer trademarks |
 | typed | POST | `/upload/presign` | upload | Create S3 presigned upload URL |

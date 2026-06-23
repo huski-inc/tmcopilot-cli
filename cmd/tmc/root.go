@@ -240,6 +240,7 @@ func resolveAPIKey(profileName string) (string, string) {
 }
 
 func writeResult(rt *runtimeContext, data any, meta map[string]any) error {
+	data = normalizeCLIResponseData(data)
 	format := "json"
 	outputPath := ""
 	if rt != nil {

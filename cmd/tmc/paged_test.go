@@ -62,7 +62,7 @@ func TestStreamPagesRequestsEachPageAndProjectsFieldsThroughPublicPath(t *testin
 			"code": 0,
 			"message": {"title": "OK", "text": "ok"},
 			"data": {
-				"items": [{"id": "id-` + page + `", "name": "mark-` + page + `", "hidden": "drop"}],
+				"items": [{"id": "id-` + page + `", "serial_number": "US-TM-8841869` + page + `", "name": "mark-` + page + `", "hidden": "drop"}],
 				"total": 3,
 				"page": ` + page + `,
 				"page_size": 1,
@@ -80,7 +80,7 @@ func TestStreamPagesRequestsEachPageAndProjectsFieldsThroughPublicPath(t *testin
 		Client: client.New(server.URL, "test-key", "", "test", time.Second),
 		Format: "ndjson",
 	}
-	opts := &listOptions{page: 1, pageSize: 1, maxPages: 2, fields: "id"}
+	opts := &listOptions{page: 1, pageSize: 1, maxPages: 2, fields: "id,serial_number"}
 	query := url.Values{"page_size": []string{"1"}}
 
 	if err := streamPages(cmd, rt, "/portfolio/trademarks/search", query, opts); err != nil {
@@ -102,7 +102,10 @@ func TestStreamPagesRequestsEachPageAndProjectsFieldsThroughPublicPath(t *testin
 	if err := scanner.Err(); err != nil {
 		t.Fatalf("scan output: %v", err)
 	}
-	wantRows := []map[string]any{{"id": "id-1"}, {"id": "id-2"}}
+	wantRows := []map[string]any{
+		{"id": "id-1", "serial_number": "88418691"},
+		{"id": "id-2", "serial_number": "88418692"},
+	}
 	if !reflect.DeepEqual(rows, wantRows) {
 		t.Fatalf("rows mismatch\nwant: %#v\n got: %#v", wantRows, rows)
 	}

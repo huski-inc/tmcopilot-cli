@@ -98,6 +98,67 @@ func TestSearchTrademarksCommandBuildsOpenAPIRequest(t *testing.T) {
 	}
 }
 
+func TestSearchTrademarksOutputStripsInternalSerialPrefix(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/trademark/search" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"code": 0,
+			"message": {"title": "OK", "text": "ok"},
+			"data": {
+				"items": [
+					{
+						"id": "US-TM-99999999",
+						"serial_number": "US-TM-88418692",
+						"serial_number_id": "US-TM-88418693"
+					}
+				]
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"search", "trademarks",
+		"--name", "Nike",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+
+	output := stdout.String()
+	for _, forbidden := range []string{
+		`"serial_number":"US-TM-88418692"`,
+		`"serial_number_id":"US-TM-88418693"`,
+	} {
+		if strings.Contains(output, forbidden) {
+			t.Fatalf("output still contains internal serial prefix %s: %s", forbidden, output)
+		}
+	}
+	for _, want := range []string{
+		`"serial_number":"88418692"`,
+		`"serial_number_id":"88418693"`,
+		`"id":"US-TM-99999999"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s: %s", want, output)
+		}
+	}
+}
+
 func TestTTABSearchCommandsBuildOpenAPIRequest(t *testing.T) {
 	tests := []struct {
 		name          string

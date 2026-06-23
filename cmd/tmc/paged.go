@@ -333,6 +333,7 @@ func eachPage(cmd *cobra.Command, rt *runtimeContext, apiPath string, query url.
 		if err := resp.DecodeData(&page); err != nil {
 			return err
 		}
+		page.Items = normalizePageItems(page.Items)
 		if err := visit(page); err != nil {
 			if errors.Is(err, errStopRows) {
 				return nil
@@ -350,6 +351,22 @@ func eachPage(cmd *cobra.Command, rt *runtimeContext, apiPath string, query url.
 		}
 		pageNo++
 	}
+}
+
+func normalizePageItems(items []map[string]any) []map[string]any {
+	if len(items) == 0 {
+		return items
+	}
+	out := make([]map[string]any, len(items))
+	for i, item := range items {
+		normalized, ok := normalizeResponseValue("", item).(map[string]any)
+		if ok {
+			out[i] = normalized
+		} else {
+			out[i] = item
+		}
+	}
+	return out
 }
 
 var errStopRows = errors.New("maximum streamed rows reached")

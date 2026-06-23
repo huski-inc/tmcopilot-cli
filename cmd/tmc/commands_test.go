@@ -1440,6 +1440,226 @@ func TestAPIDownloadWritesRawResponseBody(t *testing.T) {
 	}
 }
 
+func TestCommonLawSearchBuildsOpenAPIRequest(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/common-law/search/social/handle" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":[]}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"common-law", "search", "social-handle",
+		"--name", "Nike,Adidas",
+		"--platform", "instagram",
+		"--collaboration-id", "collab_1",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	if !reflect.DeepEqual(gotBody["name"], []any{"Nike", "Adidas"}) {
+		t.Fatalf("name body mismatch: %#v", gotBody["name"])
+	}
+	if gotBody["platform"] != "instagram" || gotBody["collaboration_id"] != "collab_1" {
+		t.Fatalf("body mismatch: %#v", gotBody)
+	}
+}
+
+func TestDomainSearchBuildsOpenAPIRequest(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/domain/search" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"total":0}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"--endpoint", server.URL, "domain", "search", "--keyword", "nike", "--limit", "25"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	if gotBody["keyword"] != "nike" || gotBody["limit"] != float64(25) {
+		t.Fatalf("body mismatch: %#v", gotBody)
+	}
+}
+
+func TestTrademarkImageCreateBuildsOpenAPIRequest(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/trademark/image/task" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"id":"task_1"}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"search", "image", "create",
+		"--bucket", "tmc-images",
+		"--key", "uploads/mark.png",
+		"--cloudfront-url", "https://cdn.example.test/mark.png",
+		"--country", "US,CA",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	if gotBody["bucket"] != "tmc-images" || gotBody["key"] != "uploads/mark.png" {
+		t.Fatalf("body mismatch: %#v", gotBody)
+	}
+	if !reflect.DeepEqual(gotBody["countries"], []any{"US", "CA"}) {
+		t.Fatalf("countries body mismatch: %#v", gotBody["countries"])
+	}
+}
+
+func TestUSPTOOfficeActionDocumentDownloadsRawResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method mismatch: %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/trademark/office-action/uspto/document" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		query := r.URL.Query()
+		for key, want := range map[string]string{
+			"serial_number":    "97346091",
+			"document_page_id": "DOC123",
+			"document_type":    "OOA",
+			"document_date":    "2024-01-02",
+		} {
+			if got := query.Get(key); got != want {
+				t.Fatalf("query %s = %q, want %q", key, got, want)
+			}
+		}
+		_, _ = w.Write([]byte("pdf-bytes"))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+	outFile := filepath.Join(t.TempDir(), "doc.pdf")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"--output", outFile,
+		"search", "uspto-document",
+		"--serial-number", "97346091",
+		"--document-page-id", "DOC123",
+		"--document-type", "OOA",
+		"--document-date", "2024-01-02",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+	raw, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("read output file: %v", err)
+	}
+	if string(raw) != "pdf-bytes" {
+		t.Fatalf("download content = %q", raw)
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"bytes":9`)) {
+		t.Fatalf("summary missing bytes: %s", stdout.String())
+	}
+}
+
+func TestNewSearchSchemasExposeSafetyAndTypedCoverage(t *testing.T) {
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"schema", "search", "image", "create"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("schema failed: %v stderr=%s", err, stderr.String())
+	}
+	var imageSchema struct {
+		Data struct {
+			Endpoint struct {
+				Coverage string `json:"coverage"`
+				Path     string `json:"path"`
+			} `json:"endpoint"`
+			Safety struct {
+				ReadOnly   bool `json:"read_only"`
+				SideEffect bool `json:"side_effect"`
+			} `json:"safety"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &imageSchema); err != nil {
+		t.Fatalf("decode schema: %v output=%s", err, stdout.String())
+	}
+	if imageSchema.Data.Endpoint.Path != "/trademark/image/task" || imageSchema.Data.Endpoint.Coverage != "typed" {
+		t.Fatalf("endpoint metadata mismatch: %#v", imageSchema.Data.Endpoint)
+	}
+	if imageSchema.Data.Safety.ReadOnly || !imageSchema.Data.Safety.SideEffect {
+		t.Fatalf("image create safety mismatch: %#v", imageSchema.Data.Safety)
+	}
+
+	cmd = NewRootCommand()
+	stdout.Reset()
+	stderr.Reset()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"api", "catalog", "--coverage", "typed", "--search", "common-law"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("catalog failed: %v stderr=%s", err, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`/common-law/search/app-store`)) {
+		t.Fatalf("catalog missing common-law typed endpoint: %s", stdout.String())
+	}
+}
+
 func TestSkillsListAndRead(t *testing.T) {
 	t.Setenv("TMCOPILOT_HOME", t.TempDir())
 

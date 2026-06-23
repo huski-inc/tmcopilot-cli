@@ -3,6 +3,7 @@ package tmc
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -195,33 +196,7 @@ func newAPIDownloadCommand(opts *globalOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if err := ensureWriteAllowed(opts, method, args[1]); err != nil {
-					return err
-				}
-				rt, err := commandRuntime(cmd, opts, !opts.dryRun)
-				if err != nil {
-					return err
-				}
-				for key, value := range headerMap {
-					rt.Client.ExtraHeaders[key] = value
-				}
-				plan := buildAPIRequestPlan(method, args[1], query, body, opts, rt, headerMap)
-				if opts.requestOut != "" {
-					if err := writeRequestPlan(opts.requestOut, plan); err != nil {
-						return err
-					}
-				}
-				if opts.dryRun {
-					return writeResult(rt, plan, nil)
-				}
-				resp, err := rt.Client.Do(cmd.Context(), method, args[1], query, body)
-				if err != nil {
-					return err
-				}
-				if err := output.WriteRawFile(opts.output, resp.Raw); err != nil {
-					return err
-				}
-				return outputDownloadSummary(cmd, rt, opts.output, resp.StatusCode, resp.Headers.Get("X-Trace-ID"), len(resp.Raw))
+				return executeAPIDownloadAndWrite(cmd, opts, method, args[1], query, body, headerMap)
 			})
 		},
 	}
@@ -230,6 +205,39 @@ func newAPIDownloadCommand(opts *globalOptions) *cobra.Command {
 	cmd.Flags().StringVar(&data, "data", "", "JSON request body or @file")
 	cmd.Flags().StringVar(&bodyFile, "body-file", "", "JSON request body file")
 	return cmd
+}
+
+func executeAPIDownloadAndWrite(cmd *cobra.Command, opts *globalOptions, method string, path string, query url.Values, body any, headers map[string]string) error {
+	if opts == nil || strings.TrimSpace(opts.output) == "" {
+		return fmt.Errorf("--output is required for download")
+	}
+	if err := ensureWriteAllowed(opts, method, path); err != nil {
+		return err
+	}
+	rt, err := commandRuntime(cmd, opts, !opts.dryRun)
+	if err != nil {
+		return err
+	}
+	for key, value := range headers {
+		rt.Client.ExtraHeaders[key] = value
+	}
+	plan := buildAPIRequestPlan(method, path, query, body, opts, rt, headers)
+	if opts.requestOut != "" {
+		if err := writeRequestPlan(opts.requestOut, plan); err != nil {
+			return err
+		}
+	}
+	if opts.dryRun {
+		return writeResult(rt, plan, nil)
+	}
+	resp, err := rt.Client.Do(cmd.Context(), method, path, query, body)
+	if err != nil {
+		return err
+	}
+	if err := output.WriteRawFile(opts.output, resp.Raw); err != nil {
+		return err
+	}
+	return outputDownloadSummary(cmd, rt, opts.output, resp.StatusCode, resp.Headers.Get("X-Trace-ID"), len(resp.Raw))
 }
 
 func outputDownloadSummary(cmd *cobra.Command, rt *runtimeContext, path string, statusCode int, traceID string, bytes int) error {

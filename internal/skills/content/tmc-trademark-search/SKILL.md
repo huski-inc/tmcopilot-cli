@@ -26,6 +26,13 @@ Use this skill when the user asks to search trademarks, office action cases, TTA
 | Company / owner search | `tmc search owners` |
 | Company search alias | `tmc search companies` |
 | Owner ranking | `tmc search owner-ranking` |
+| Trademark image task | `tmc search image create` |
+| Trademark image result | `tmc search image result` |
+| USPTO Office Action document | `tmc search uspto-document` |
+| Common-law app store search | `tmc common-law search app-store` |
+| Common-law social handle search | `tmc common-law search social-handle` |
+| Common-law web search | `tmc common-law search google-text` |
+| Domain name search | `tmc domain search` |
 
 ## Examples
 
@@ -65,12 +72,36 @@ Company / owner search:
 tmc search owners --name "Nike" --limit 20
 ```
 
+Common-law and domain evidence:
+
+```bash
+tmc common-law search social-handle --name Nike --platform instagram
+tmc common-law search google-text --name Nike
+tmc domain search --keyword nike --limit 20
+```
+
+Trademark image search:
+
+```bash
+tmc search image create --bucket tmc-images --key uploads/mark.png --country US,CA
+tmc search image result <task-id>
+```
+
+USPTO Office Action document download:
+
+```bash
+tmc --output office-action.pdf search uspto-document --serial-number 97346091 --document-page-id <id> --document-type <type> --document-date <date>
+```
+
 Schema inspection before raw API fallback:
 
 ```bash
 tmc schema search trademarks
 tmc schema search office-actions
 tmc schema search ttab
+tmc schema common-law search social-handle
+tmc schema domain search
+tmc schema search image create
 ```
 
 ## Raw API Fallback

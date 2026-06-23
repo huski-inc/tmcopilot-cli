@@ -350,6 +350,12 @@ func isReadLikeCommand(key string, spec commandEndpointSpec) bool {
 	if method != "POST" {
 		return false
 	}
+	if key == "search image create" {
+		return false
+	}
+	if strings.HasPrefix(key, "common-law ") || strings.HasPrefix(key, "domain ") {
+		return true
+	}
 	key = strings.TrimSpace(key)
 	if strings.HasPrefix(key, "search ") {
 		return true
@@ -434,6 +440,14 @@ var commandEndpointSpecs = map[string]commandEndpointSpec{
 	"competitors activities list":          {Method: "GET", Path: "/competitors/activities"},
 	"competitors list":                     {Method: "GET", Path: "/competitors"},
 	"competitors reports list":             {Method: "GET", Path: "/competitors/reports"},
+	"common-law max-similarity":            {Method: "POST", Path: "/common-law/max-similarity"},
+	"common-law search app-store":          {Method: "POST", Path: "/common-law/search/app-store"},
+	"common-law search ecommerce-handle":   {Method: "POST", Path: "/common-law/search/ecommerce/handle"},
+	"common-law search google-text":        {Method: "POST", Path: "/common-law/search/google/text"},
+	"common-law search social-handle":      {Method: "POST", Path: "/common-law/search/social/handle"},
+	"common-law search social-text":        {Method: "POST", Path: "/common-law/search/social/text"},
+	"domain max-similarity":                {Method: "POST", Path: "/domain/max-similarity"},
+	"domain search":                        {Method: "POST", Path: "/domain/search"},
 	"files list":                           {Method: "GET", Path: "/files"},
 	"files presign":                        {Method: "POST", Path: "/files/presign"},
 	"files upload-presign":                 {Method: "POST", Path: "/upload/presign"},
@@ -465,6 +479,9 @@ var commandEndpointSpecs = map[string]commandEndpointSpec{
 	"portfolio trademarks list":            {Method: "GET", Path: "/portfolio/trademarks/search"},
 	"portfolio trademarks monitored":       {Method: "GET", Path: "/portfolio/trademarks/monitored"},
 	"search detail":                        {Method: "POST", Path: "/trademark/detail"},
+	"search image create":                  {Method: "POST", Path: "/trademark/image/task"},
+	"search image result":                  {Method: "GET", Path: "/trademark/image/task/{id}/result"},
+	"search image result-post":             {Method: "POST", Path: "/trademark/image/task/result"},
 	"search lawyer-contact":                {Method: "GET", Path: "/trademark/lawyer/contact"},
 	"search lawyer-ranking":                {Method: "GET", Path: "/trademark/lawyer/ranking"},
 	"search lawyers":                       {Method: "GET", Path: "/trademark/lawyer/search"},
@@ -476,4 +493,5 @@ var commandEndpointSpecs = map[string]commandEndpointSpec{
 	"search trademarks":                    {Method: "POST", Path: "/trademark/search"},
 	"search ttab":                          {Method: "POST", Path: "/trademark/ttab/search"},
 	"search ttab-case":                     {Method: "GET", Path: "/trademark/ttab/{case_number}"},
+	"search uspto-document":                {Method: "GET", Path: "/trademark/office-action/uspto/document"},
 }

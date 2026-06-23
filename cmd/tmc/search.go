@@ -29,6 +29,8 @@ func newSearchCommand(opts *globalOptions) *cobra.Command {
 	cmd.AddCommand(newLawyerContactCommand(opts))
 	cmd.AddCommand(newSearchTipsCommand(opts))
 	cmd.AddCommand(newSearchSummaryCommand(opts))
+	cmd.AddCommand(newTrademarkImageCommand(opts))
+	cmd.AddCommand(newUSPTOOfficeActionDocumentCommand(opts))
 	return cmd
 }
 
@@ -446,5 +448,121 @@ func newSearchSummaryCommand(opts *globalOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&data, "data", "", "JSON request body or @file")
+	return cmd
+}
+
+func newTrademarkImageCommand(opts *globalOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "image",
+		Aliases: []string{"image-search"},
+		Short:   "Create and inspect trademark image search tasks",
+	}
+	cmd.AddCommand(newTrademarkImageCreateCommand(opts))
+	cmd.AddCommand(newTrademarkImageResultCommand(opts))
+	cmd.AddCommand(newTrademarkImageResultPostCommand(opts))
+	return cmd
+}
+
+func newTrademarkImageCreateCommand(opts *globalOptions) *cobra.Command {
+	var data string
+	var bucket, key, cloudfrontURL string
+	var countries []string
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a trademark image search task",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			body, err := bodyFromDataOrBuilder(data, func() (any, error) {
+				req := openapi.ImageSearchTaskRequest{
+					Bucket:        strings.TrimSpace(bucket),
+					Key:           strings.TrimSpace(key),
+					CloudfrontURL: strings.TrimSpace(cloudfrontURL),
+					Countries:     splitStringValues(countries),
+				}
+				if req.Bucket == "" {
+					return nil, fmt.Errorf("--bucket is required")
+				}
+				if req.Key == "" {
+					return nil, fmt.Errorf("--key is required")
+				}
+				return req, nil
+			})
+			if err != nil {
+				return err
+			}
+			return callAPIAndWrite(cmd, opts, http.MethodPost, "/trademark/image/task", nil, body)
+		},
+	}
+	cmd.Flags().StringVar(&data, "data", "", "JSON request body or @file")
+	cmd.Flags().StringVar(&bucket, "bucket", "", "uploaded image S3 bucket")
+	cmd.Flags().StringVar(&key, "key", "", "uploaded image S3 key")
+	cmd.Flags().StringVar(&cloudfrontURL, "cloudfront-url", "", "uploaded image CloudFront URL")
+	cmd.Flags().StringArrayVar(&countries, "country", nil, "country code; repeatable or comma-separated")
+	return cmd
+}
+
+func newTrademarkImageResultCommand(opts *globalOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:   "result <id>",
+		Short: "Get a trademark image search task result",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return callAPIAndWrite(cmd, opts, http.MethodGet, "/trademark/image/task/"+url.PathEscape(args[0])+"/result", nil, nil)
+		},
+	}
+}
+
+func newTrademarkImageResultPostCommand(opts *globalOptions) *cobra.Command {
+	var data string
+	cmd := &cobra.Command{
+		Use:   "result-post <id>",
+		Short: "Get a trademark image search task result through the POST endpoint",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			body, err := bodyFromDataOrBuilder(data, func() (any, error) {
+				return openapi.ImageSearchTaskResultRequest{ID: strings.TrimSpace(args[0])}, nil
+			})
+			if err != nil {
+				return err
+			}
+			return callAPIAndWrite(cmd, opts, http.MethodPost, "/trademark/image/task/result", nil, body)
+		},
+	}
+	cmd.Flags().StringVar(&data, "data", "", "JSON request body or @file")
+	return cmd
+}
+
+func newUSPTOOfficeActionDocumentCommand(opts *globalOptions) *cobra.Command {
+	var serialNumber, documentPageID, documentType, documentDate string
+	cmd := &cobra.Command{
+		Use:   "uspto-document",
+		Short: "Download a USPTO Office Action document",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			query := url.Values{}
+			setQuery(query, "serial_number", serialNumber)
+			setQuery(query, "document_page_id", documentPageID)
+			setQuery(query, "document_type", documentType)
+			setQuery(query, "document_date", documentDate)
+			for _, required := range []struct {
+				flag  string
+				value string
+			}{
+				{flag: "--serial-number", value: serialNumber},
+				{flag: "--document-page-id", value: documentPageID},
+				{flag: "--document-type", value: documentType},
+				{flag: "--document-date", value: documentDate},
+			} {
+				if strings.TrimSpace(required.value) == "" {
+					return fmt.Errorf("%s is required", required.flag)
+				}
+			}
+			return handleCommand(cmd, func() error {
+				return executeAPIDownloadAndWrite(cmd, opts, http.MethodGet, "/trademark/office-action/uspto/document", query, nil, nil)
+			})
+		},
+	}
+	cmd.Flags().StringVar(&serialNumber, "serial-number", "", "trademark serial number")
+	cmd.Flags().StringVar(&documentPageID, "document-page-id", "", "USPTO document page id")
+	cmd.Flags().StringVar(&documentType, "document-type", "", "USPTO document type")
+	cmd.Flags().StringVar(&documentDate, "document-date", "", "USPTO document date")
 	return cmd
 }

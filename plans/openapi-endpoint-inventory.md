@@ -58,17 +58,17 @@
 | typed | GET | `/auth/ui-settings` | auth | Get dashboard UI settings |
 | raw | PUT | `/auth/workspace` | auth | Rename workspace |
 | typed | GET | `/auth/workspaces` | auth | List accessible workspaces |
-| raw | POST | `/common-law/max-similarity` | common-law | Get max common law similarity |
-| raw | POST | `/common-law/search/app-store` | common-law | App store search for common law |
-| raw | POST | `/common-law/search/ecommerce/handle` | common-law | E-commerce handle search for common law |
-| raw | POST | `/common-law/search/google/text` | common-law | Google text search for common law |
-| raw | POST | `/common-law/search/social/handle` | common-law | Social handle search for common law |
-| raw | POST | `/common-law/search/social/text` | common-law | Social network text search for common law |
+| typed | POST | `/common-law/max-similarity` | common-law | Get max common law similarity |
+| typed | POST | `/common-law/search/app-store` | common-law | App store search for common law |
+| typed | POST | `/common-law/search/ecommerce/handle` | common-law | E-commerce handle search for common law |
+| typed | POST | `/common-law/search/google/text` | common-law | Google text search for common law |
+| typed | POST | `/common-law/search/social/handle` | common-law | Social handle search for common law |
+| typed | POST | `/common-law/search/social/text` | common-law | Social network text search for common law |
 | typed | GET | `/competitors` | competitors | List competitors |
 | typed | GET | `/competitors/activities` | competitors | List competitor activities |
 | typed | GET | `/competitors/reports` | competitors | List competitor reports |
-| raw | POST | `/domain/max-similarity` | domain | Get max domain name similarity |
-| raw | POST | `/domain/search` | domain | Search domain names by keyword |
+| typed | POST | `/domain/max-similarity` | domain | Get max domain name similarity |
+| typed | POST | `/domain/search` | domain | Search domain names by keyword |
 | typed | GET | `/files` | files | List files |
 | typed | POST | `/files/presign` | files | Create file upload URL |
 | typed | GET | `/gap-analyses` | gap-analysis | List gap analyses |
@@ -122,15 +122,15 @@
 | raw | GET | `/portfolio/trademarks/{trademarkId}/office-actions/{id}` | portfolio-action | Get an office action |
 | raw | PUT | `/portfolio/trademarks/{trademarkId}/office-actions/{id}/status` | portfolio-action | Update office action status |
 | typed | POST | `/trademark/detail` | trademark | Get trademark details |
-| raw | POST | `/trademark/image/task` | trademark | Create image search task |
-| raw | POST | `/trademark/image/task/result` | trademark | Get image search task result |
-| raw | GET | `/trademark/image/task/{id}/result` | trademark | Get image search task result |
+| typed | POST | `/trademark/image/task` | trademark | Create image search task |
+| typed | POST | `/trademark/image/task/result` | trademark | Get image search task result |
+| typed | GET | `/trademark/image/task/{id}/result` | trademark | Get image search task result |
 | typed | GET | `/trademark/lawyer/contact` | trademark | Get lawyer contact information |
 | typed | GET | `/trademark/lawyer/ranking` | trademark | Get lawyer ranking list from Doris |
 | typed | GET | `/trademark/lawyer/search` | trademark | Search lawyers by name or advanced filters |
 | raw | POST | `/trademark/max-similarity` | trademark | Get max trademark similarity per analysis type |
 | typed | POST | `/trademark/office-action/search` | trademark | Search Office Actions |
-| raw | GET | `/trademark/office-action/uspto/document` | trademark | Get USPTO document |
+| typed | GET | `/trademark/office-action/uspto/document` | trademark | Get USPTO document |
 | typed | GET | `/trademark/owner/ranking` | trademark | Get owner ranking list from Doris |
 | typed | GET | `/trademark/owner/search` | trademark | Search brand owners by name |
 | typed | POST | `/trademark/search` | trademark | Search US trademarks by text |

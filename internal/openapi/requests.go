@@ -170,3 +170,48 @@ func (r GapCreateRequest) Empty() bool {
 type GapGenerateReportRequest struct {
 	SelectedClasses []string `json:"selected_classes,omitempty"`
 }
+
+type CommonLawSearchRequest struct {
+	Name                  []string `json:"name,omitempty"`
+	Platform              string   `json:"platform,omitempty"`
+	CollaborationID       string   `json:"collaboration_id,omitempty"`
+	CollaborationSharedID string   `json:"collaboration_shared_id,omitempty"`
+}
+
+func (r CommonLawSearchRequest) Empty() bool {
+	return len(r.Name) == 0 &&
+		r.Platform == "" &&
+		r.CollaborationID == "" &&
+		r.CollaborationSharedID == ""
+}
+
+type CommonLawMaxSimilarityRequest struct {
+	Keyword string `json:"keyword,omitempty"`
+}
+
+type DomainSearchRequest struct {
+	Keyword string `json:"keyword,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
+}
+
+type DomainMaxSimilarityRequest struct {
+	Keyword string `json:"keyword,omitempty"`
+}
+
+type ImageSearchTaskRequest struct {
+	Bucket        string   `json:"bucket,omitempty"`
+	Key           string   `json:"key,omitempty"`
+	CloudfrontURL string   `json:"cloudfront_url,omitempty"`
+	Countries     []string `json:"countries,omitempty"`
+}
+
+func (r ImageSearchTaskRequest) Empty() bool {
+	return r.Bucket == "" &&
+		r.Key == "" &&
+		r.CloudfrontURL == "" &&
+		len(r.Countries) == 0
+}
+
+type ImageSearchTaskResultRequest struct {
+	ID string `json:"id,omitempty"`
+}

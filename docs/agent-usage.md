@@ -45,7 +45,7 @@ printf '%s' "$TMCOPILOT_API_KEY" | tmc setup --api-key-stdin
 
 Command selection order:
 
-- Prefer typed commands such as `tmc search trademarks`, `tmc portfolio trademarks list`, and `tmc gap create`.
+- Prefer typed commands such as `tmc search trademarks`, `tmc common-law search social-handle`, `tmc domain search`, `tmc portfolio trademarks list`, and `tmc gap create`.
 - Use aliases when they match the user's wording, for example `tmc search companies` for owner/company search and `tmc search attorneys` for lawyer search.
 - Use `tmc schema <command...>` to inspect a CLI command's flags, endpoint summary, safety metadata, pagination support, and examples before using an unfamiliar typed command.
 - Add `--openapi` only when raw Swagger parameters, responses, and definitions are needed.
@@ -84,6 +84,13 @@ tmc --endpoint http://localhost:8080 portfolio trademarks list \
 
 ```bash
 tmc search trademarks --name Nike --limit 20 --output search.json
+```
+
+```bash
+tmc common-law search google-text --name Nike --output common-law.json
+tmc domain search --keyword nike --limit 20 --output domains.json
+tmc search image create --bucket tmc-images --key uploads/mark.png --country US
+tmc --output office-action.pdf search uspto-document --serial-number 97346091 --document-page-id <id> --document-type <type> --document-date <date>
 ```
 
 ```bash

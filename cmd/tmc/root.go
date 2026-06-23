@@ -148,6 +148,8 @@ DISCOVERY:
 	root.AddCommand(newSchemaCommand(opts))
 	root.AddCommand(newPortfolioCommand(opts))
 	root.AddCommand(newCompetitorsCommand(opts))
+	root.AddCommand(newCommonLawCommand(opts))
+	root.AddCommand(newDomainCommand(opts))
 	root.AddCommand(newSearchCommand(opts))
 	root.AddCommand(newGapCommand(opts))
 	root.AddCommand(newFilesCommand(opts))

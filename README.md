@@ -34,6 +34,8 @@ Install · Quick Start · Authentication · Features · Agent Skills · Output &
 | Lawyers and attorneys | Search lawyers / attorneys, rankings, and contact information |
 | Office Actions | Search Office Actions by mark, issue type, and related filters |
 | TTAB | Search TTAB cases and fetch cases by case number |
+| Common law and domains | Search app stores, ecommerce/social handles, web evidence, and domain names |
+| Trademark image search | Create image search tasks, inspect results, and download USPTO Office Action documents |
 | Portfolio | View portfolio trademarks, monitoring summaries, counts, activity, and tasks |
 | Portfolio Actions | Query Office Action, conflict, CBP, and other action lists |
 | Competitors | Query competitors, competitor activities, and reports |
@@ -239,7 +241,21 @@ tmc search ttab --plaintiff Nike --issue opposition
 tmc search ttab-case <case-number>
 tmc search owners --name "Nike"
 tmc search lawyers --name Smith --state CA
+tmc search image create --bucket tmc-images --key uploads/mark.png --country US,CA
+tmc search image result <task-id>
+tmc --output office-action.pdf search uspto-document --serial-number 97346091 --document-page-id <id> --document-type <type> --document-date <date>
 tmc search summary --data @summary-request.json
+```
+
+### Common Law And Domains
+
+```bash
+tmc common-law search app-store --name Nike --platform ios
+tmc common-law search social-handle --name Nike --platform instagram
+tmc common-law search google-text --name Nike
+tmc common-law max-similarity --keyword Nike
+tmc domain search --keyword nike --limit 20
+tmc domain max-similarity --keyword nike
 ```
 
 ### Portfolio
@@ -291,6 +307,8 @@ Common workflows are available as stable commands:
 
 ```bash
 tmc search trademarks --name Nike --limit 20
+tmc common-law search social-handle --name Nike --platform instagram
+tmc domain search --keyword nike --limit 20
 tmc portfolio trademarks list --page-all --format ndjson --output trademarks.ndjson
 tmc gap create --data @gap-create.json
 ```

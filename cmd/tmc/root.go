@@ -73,15 +73,23 @@ func Execute(args []string, in io.Reader, out io.Writer, errOut io.Writer) int {
 	if errOut != nil {
 		cmd.SetErr(errOut)
 	}
+	lightweightUpdate := maybeRunLightweightAutomaticUpdateCheck(cmd, args)
 	executedCmd, err := cmd.ExecuteC()
 	if err != nil {
 		var reported reportedError
 		if !errors.As(err, &reported) {
 			output.WriteFailure(cmd.ErrOrStderr(), classifyCommandFailure(cmd, args, err))
 		}
+		if lightweightUpdate != nil {
+			writeUpdateAvailableNotice(cmd.ErrOrStderr(), *lightweightUpdate)
+		}
 		return exitCodeFor(err)
 	}
-	maybeRunAutomaticUpdateCheck(executedCmd)
+	if lightweightUpdate != nil {
+		writeUpdateAvailableNotice(executedCmd.ErrOrStderr(), *lightweightUpdate)
+	} else {
+		maybeRunAutomaticUpdateCheck(executedCmd)
+	}
 	return 0
 }
 

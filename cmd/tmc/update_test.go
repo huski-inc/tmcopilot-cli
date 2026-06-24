@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -243,5 +244,99 @@ func TestUpdateCommandInstallsWhenUpdateAvailable(t *testing.T) {
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("installer stdout")) || !bytes.Contains(stderr.Bytes(), []byte("installer stderr")) {
 		t.Fatalf("installer output missing from stderr: %s", stderr.String())
+	}
+}
+
+func TestExecuteNonInteractiveReportsLightweightUpdateOnSuccess(t *testing.T) {
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"dist-tags": {"experimental": "0.1.0-experimental.15"},
+			"versions": {
+				"0.1.0-experimental.14": {},
+				"0.1.0-experimental.15": {}
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_UPDATE_REGISTRY_URL", server.URL)
+	oldVersion := version.Version
+	version.Version = "v0.1.0-experimental.14"
+	oldRunner := runUpdateInstaller
+	runUpdateInstaller = func(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		t.Fatal("non-interactive lightweight update check should not install")
+		return nil
+	}
+	t.Cleanup(func() {
+		version.Version = oldVersion
+		runUpdateInstaller = oldRunner
+	})
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Execute([]string{"version"}, nil, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d stderr=%s", exitCode, stderr.String())
+	}
+	if requests != 1 {
+		t.Fatalf("update check requests = %d, want 1", requests)
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"version":"v0.1.0-experimental.14"`)) {
+		t.Fatalf("stdout missing version payload: %s", stdout.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("Update available: tmc v0.1.0-experimental.14 -> v0.1.0-experimental.15")) {
+		t.Fatalf("stderr missing update notice: %s", stderr.String())
+	}
+	if bytes.Contains(stderr.Bytes(), []byte("Installing:")) {
+		t.Fatalf("non-interactive update check attempted install: %s", stderr.String())
+	}
+}
+
+func TestExecuteNonInteractiveReportsLightweightUpdateAfterParseError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"dist-tags": {"experimental": "0.1.0-experimental.15"},
+			"versions": {
+				"0.1.0-experimental.14": {},
+				"0.1.0-experimental.15": {}
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_UPDATE_REGISTRY_URL", server.URL)
+	oldVersion := version.Version
+	version.Version = "v0.1.0-experimental.14"
+	t.Cleanup(func() { version.Version = oldVersion })
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Execute([]string{
+		"search", "uspto-document",
+		"--profile", "test",
+		"--serial-number", "88418692",
+		"--document-date", "2025-06-23",
+		"--document-type", "xml",
+		"--document-page-id",
+	}, nil, &stdout, &stderr)
+	if exitCode != 1 {
+		t.Fatalf("exit code = %d, want 1 stderr=%s", exitCode, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout should be empty on parse error: %s", stdout.String())
+	}
+	output := stderr.String()
+	if !strings.Contains(output, `"ok":false`) || !strings.Contains(output, "flag needs an argument: --document-page-id") {
+		t.Fatalf("stderr missing structured parse error: %s", output)
+	}
+	if !strings.Contains(output, "Update available: tmc v0.1.0-experimental.14 -> v0.1.0-experimental.15") {
+		t.Fatalf("stderr missing update notice: %s", output)
+	}
+	if strings.Index(output, `"ok":false`) > strings.Index(output, "Update available:") {
+		t.Fatalf("update notice should follow the structured error: %s", output)
 	}
 }

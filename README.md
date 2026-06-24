@@ -197,12 +197,12 @@ Supported environment variables:
 - `TMCOPILOT_ENDPOINT` or `TMC_ENDPOINT`
 - `TMCOPILOT_HOME`, which changes the local config directory from the default `~/.tmcopilot`
 - `TMCOPILOT_NO_UPDATE_CHECK=1`, which disables automatic update checks
-- `TMCOPILOT_NO_AUTO_UPDATE=1`, which keeps automatic checks but prints the install command instead of running it
+- `TMCOPILOT_NO_AUTO_UPDATE=1`, which keeps automatic checks but prevents interactive auto-install and prints the install command instead
 - `TMCOPILOT_UPDATE_CHECK_INTERVAL=2h`, which changes the automatic update check interval
 
 ## Updates
 
-`tmc` automatically checks npm package metadata at most once every two hours when stderr is an interactive terminal. When a newer version is available, it runs `npx --yes @tmcopilot/cli@<channel> update` and keeps all installer output on stderr so command stdout stays machine-readable. The check is silent when there is no newer version, when the network is unavailable, in non-interactive scripts, or when the binary is a local `dev` build.
+`tmc` automatically checks npm package metadata at most once every two hours. In interactive terminals, when a newer version is available, it runs `npx --yes @tmcopilot/cli@<channel> update` and keeps all installer output on stderr so command stdout stays machine-readable. In non-interactive scripts and agent runs, the check is lightweight: it never installs automatically, and it writes only an update notice plus install command to stderr when an update is available. The check is silent when there is no newer version, when the network is unavailable, or when the binary is a local `dev` build.
 
 Check manually without installing:
 
@@ -252,6 +252,8 @@ tmc search image result <task-id>
 tmc --output office-action.pdf search uspto-document --serial-number 97346091 --document-page-id <id> --document-type <type> --document-date <date>
 tmc search summary --data @summary-request.json
 ```
+
+Typed trademark search sends `["Exact","Fuzzy","Phonetic"]` when `--similarity` is not provided. Use repeated or comma-separated `--similarity` values to narrow the analysis types.
 
 ### Common Law And Domains
 

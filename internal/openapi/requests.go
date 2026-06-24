@@ -13,6 +13,7 @@ type TrademarkSearchRequest struct {
 	LawFirms             []string `json:"law_firm,omitempty"`
 	DesignSearchCodes    []string `json:"design_search_code,omitempty"`
 	DesignSearchPrefixes []string `json:"design_search_prefix,omitempty"`
+	Similarity           []string `json:"similarity,omitempty"`
 	SortFilingDate       string   `json:"sort_filing_date,omitempty"`
 	SortMark             string   `json:"sort_mark,omitempty"`
 	SortSerialNumber     string   `json:"sort_serial_number,omitempty"`
@@ -35,6 +36,7 @@ func (r TrademarkSearchRequest) Empty() bool {
 		len(r.LawFirms) == 0 &&
 		len(r.DesignSearchCodes) == 0 &&
 		len(r.DesignSearchPrefixes) == 0 &&
+		len(r.Similarity) == 0 &&
 		r.SortFilingDate == "" &&
 		r.SortMark == "" &&
 		r.SortSerialNumber == "" &&

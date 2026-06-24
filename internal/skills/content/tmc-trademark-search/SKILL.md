@@ -1,6 +1,6 @@
 ---
 name: tmc-trademark-search
-version: 1.3.1
+version: 1.3.2
 description: "Trademark, office action, TTAB, lawsuit, lawyer, and company/owner search commands for TMCopilot."
 cliHelp: "tmc search --help; tmc lawsuits --help; tmc lawyers --help"
 ---
@@ -48,6 +48,8 @@ Trademark search with multiple classes:
 ```bash
 tmc search trademarks --name Nike --class 25,35,42 --limit 20
 ```
+
+Typed trademark search sends `Exact,Fuzzy,Phonetic` similarity analysis types by default. Add `--similarity Exact`, repeated `--similarity` flags, or comma-separated values only when the user wants to narrow those analysis types.
 
 Equivalent repeated flags:
 

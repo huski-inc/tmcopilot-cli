@@ -140,39 +140,27 @@ func runUpdateCommand(cmd *cobra.Command, opts *globalOptions, install bool) err
 	})
 }
 
+func maybeRunLightweightAutomaticUpdateCheck(cmd *cobra.Command, args []string) *updateCheckResult {
+	if cmd == nil || shouldSkipLightweightAutomaticUpdateCheck(cmd, args) {
+		return nil
+	}
+	result, ok := runAutomaticUpdateProbe()
+	if !ok || !result.UpdateAvailable {
+		return nil
+	}
+	return &result
+}
+
 func maybeRunAutomaticUpdateCheck(cmd *cobra.Command) {
 	if cmd == nil || shouldSkipAutomaticUpdateCheck(cmd) {
 		return
 	}
-	cache, _ := loadUpdateCheckCache()
-	now := time.Now()
-	if !updateCheckDue(cache, now, updateCheckInterval()) {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), automaticUpdateTimeout)
-	defer cancel()
-	result, err := checkForCLIUpdate(ctx, updateCheckOptions{
-		CurrentVersion: version.Version,
-		RegistryURL:    updateRegistryURL(),
-		Timeout:        automaticUpdateTimeout,
-		Now:            now,
-	})
-	if err != nil {
-		_ = saveUpdateCheckCache(updateCheckCache{
-			CheckedAt:      now.UTC().Format(time.RFC3339),
-			CurrentVersion: version.Version,
-			Source:         updateRegistryURL(),
-			Error:          err.Error(),
-		})
-		return
-	}
-	_ = saveUpdateCheckCacheFromResult(result, "")
-	if !result.UpdateAvailable {
+	result, ok := runAutomaticUpdateProbe()
+	if !ok || !result.UpdateAvailable {
 		return
 	}
 	if automaticUpdateInstallDisabled() {
-		fmt.Fprintf(cmd.ErrOrStderr(), "\nUpdate available: tmc %s -> %s\n", result.CurrentVersion, result.LatestVersion)
-		fmt.Fprintf(cmd.ErrOrStderr(), "Run: %s\n", result.InstallCommand)
+		writeUpdateAvailableNotice(cmd.ErrOrStderr(), result)
 		return
 	}
 	installCtx, installCancel := context.WithTimeout(context.Background(), automaticInstallTimeout)
@@ -189,6 +177,33 @@ func maybeRunAutomaticUpdateCheck(cmd *cobra.Command) {
 	_ = saveUpdateCheckCacheFromResult(result, "")
 }
 
+func runAutomaticUpdateProbe() (updateCheckResult, bool) {
+	cache, _ := loadUpdateCheckCache()
+	now := time.Now()
+	if !updateCheckDue(cache, now, updateCheckInterval()) {
+		return updateCheckResult{}, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), automaticUpdateTimeout)
+	defer cancel()
+	result, err := checkForCLIUpdate(ctx, updateCheckOptions{
+		CurrentVersion: version.Version,
+		RegistryURL:    updateRegistryURL(),
+		Timeout:        automaticUpdateTimeout,
+		Now:            now,
+	})
+	if err != nil {
+		_ = saveUpdateCheckCache(updateCheckCache{
+			CheckedAt:      now.UTC().Format(time.RFC3339),
+			CurrentVersion: version.Version,
+			Source:         updateRegistryURL(),
+			Error:          err.Error(),
+		})
+		return updateCheckResult{}, false
+	}
+	_ = saveUpdateCheckCacheFromResult(result, "")
+	return result, true
+}
+
 func shouldSkipAutomaticUpdateCheck(cmd *cobra.Command) bool {
 	if automaticUpdateCheckDisabled() || !releasedVersion(version.Version) {
 		return true
@@ -202,8 +217,95 @@ func shouldSkipAutomaticUpdateCheck(cmd *cobra.Command) bool {
 			return true
 		}
 	}
+	return !isInteractiveStderr(cmd)
+}
+
+func shouldSkipLightweightAutomaticUpdateCheck(cmd *cobra.Command, args []string) bool {
+	if automaticUpdateCheckDisabled() || !releasedVersion(version.Version) {
+		return true
+	}
+	if isInteractiveStderr(cmd) {
+		return true
+	}
+	if firstCommandArg(args) == "update" {
+		return true
+	}
+	return boolFlagEnabledInArgs(args, "dry-run")
+}
+
+func isInteractiveStderr(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
 	file, ok := cmd.ErrOrStderr().(*os.File)
-	return !ok || !term.IsTerminal(int(file.Fd()))
+	return ok && term.IsTerminal(int(file.Fd()))
+}
+
+func writeUpdateAvailableNotice(w io.Writer, result updateCheckResult) {
+	if w == nil {
+		w = os.Stderr
+	}
+	fmt.Fprintf(w, "\nUpdate available: tmc %s -> %s\n", result.CurrentVersion, result.LatestVersion)
+	fmt.Fprintf(w, "Run: %s\n", result.InstallCommand)
+}
+
+func firstCommandArg(args []string) string {
+	valueFlags := map[string]bool{
+		"endpoint":        true,
+		"format":          true,
+		"idempotency-key": true,
+		"output":          true,
+		"profile":         true,
+		"request-out":     true,
+		"timeout":         true,
+		"workspace":       true,
+	}
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			return ""
+		}
+		if !strings.HasPrefix(arg, "-") {
+			return arg
+		}
+		name, hasValue := longFlagNameAndValue(arg)
+		if valueFlags[name] && !hasValue {
+			i++
+		}
+	}
+	return ""
+}
+
+func boolFlagEnabledInArgs(args []string, flagName string) bool {
+	for _, arg := range args {
+		if arg == "--" {
+			return false
+		}
+		name, hasValue := longFlagNameAndValue(arg)
+		if name != flagName {
+			continue
+		}
+		if !hasValue {
+			return true
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(arg, "--"+flagName+"="))
+		switch strings.ToLower(value) {
+		case "", "1", "t", "true", "y", "yes", "on":
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func longFlagNameAndValue(arg string) (string, bool) {
+	if !strings.HasPrefix(arg, "--") || arg == "--" {
+		return "", false
+	}
+	name := strings.TrimPrefix(arg, "--")
+	name, _, hasValue := strings.Cut(name, "=")
+	return name, hasValue
 }
 
 func checkForCLIUpdate(ctx context.Context, opts updateCheckOptions) (updateCheckResult, error) {

@@ -1,6 +1,6 @@
 ---
 name: tmc-shared
-version: 1.4.2
+version: 1.4.3
 description: "TMCopilot CLI shared guidance: auth, output contracts, safety flags, large-result rules, and when to use catalog/schema-style discovery."
 cliHelp: "tmc --help"
 ---
@@ -18,7 +18,7 @@ Read this first before using other TMCopilot CLI skills.
 - Add `--openapi` only when raw Swagger definitions are necessary.
 - Use `tmc api catalog` to discover public generated Swagger endpoints. Internal endpoints are not exposed through CLI catalog, endpoint/schema inspection, or raw API fallback.
 - Use `tmc api schema METHOD /path` only for public endpoint debugging.
-- Use `tmc update check` when the user asks whether the local CLI is current. Automatic update checks may install newer releases in interactive terminals; set `TMCOPILOT_NO_AUTO_UPDATE=1` when local binaries must not be modified.
+- Use `tmc update check` when the user asks whether the local CLI is current. Automatic update checks may install newer releases only in interactive terminals; non-interactive agent runs only print an update notice to stderr when a newer release is available. Set `TMCOPILOT_NO_AUTO_UPDATE=1` when local binaries must not be modified.
 - Use `--output` for large JSON.
 - Use `--page-all` only on paginated list commands; it pages through the API one page at a time.
 - Prefer `--format ndjson --output file.ndjson --manifest file.manifest.json` for large exports.
@@ -48,7 +48,7 @@ For agent environments, prefer `tmc setup --no-wait`. Send the printed authoriza
 
 ## Updates
 
-Automatic update checks run at most once every two hours in interactive terminals. When a newer version is available, they run the npm installer and keep installer output on stderr. `tmc update check` returns a JSON envelope with `current_version`, `latest_version`, `update_available`, and `install_command` without installing.
+Automatic update checks run at most once every two hours. Interactive terminals may run the npm installer when a newer version is available and keep installer output on stderr. Non-interactive scripts and agent runs never auto-install; they only print an update notice and install command to stderr. `tmc update check` returns a JSON envelope with `current_version`, `latest_version`, `update_available`, and `install_command` without installing.
 
 ## Diagnostics
 

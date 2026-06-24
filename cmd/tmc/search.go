@@ -36,6 +36,10 @@ func newSearchCommand(opts *globalOptions) *cobra.Command {
 	return cmd
 }
 
+func defaultTrademarkSearchSimilarities() []string {
+	return []string{"Exact", "Fuzzy", "Phonetic"}
+}
+
 func newTTABCommand(opts *globalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ttab",
@@ -49,7 +53,7 @@ func newTTABCommand(opts *globalOptions) *cobra.Command {
 func newTrademarkSearchCommand(opts *globalOptions) *cobra.Command {
 	var data string
 	var names, serials, registrations, classes, statuses, owners, regions []string
-	var goodsServices, lawyers, lawFirms, designCodes, designPrefixes []string
+	var goodsServices, lawyers, lawFirms, designCodes, designPrefixes, similarities []string
 	var limit int
 	var page int
 	var sortFilingDate, sortMark, sortSerialNumber, sortStatus, sortSimilarity string
@@ -72,6 +76,7 @@ func newTrademarkSearchCommand(opts *globalOptions) *cobra.Command {
 					LawFirms:             splitStringValues(lawFirms),
 					DesignSearchCodes:    splitStringValues(designCodes),
 					DesignSearchPrefixes: splitStringValues(designPrefixes),
+					Similarity:           splitStringValues(similarities),
 					SortFilingDate:       strings.TrimSpace(sortFilingDate),
 					SortMark:             strings.TrimSpace(sortMark),
 					SortSerialNumber:     strings.TrimSpace(sortSerialNumber),
@@ -86,6 +91,9 @@ func newTrademarkSearchCommand(opts *globalOptions) *cobra.Command {
 				}
 				if req.Empty() {
 					return nil, fmt.Errorf("search trademarks requires --data or at least one search/filter flag")
+				}
+				if len(req.Similarity) == 0 {
+					req.Similarity = defaultTrademarkSearchSimilarities()
 				}
 				return req, nil
 			})
@@ -108,6 +116,7 @@ func newTrademarkSearchCommand(opts *globalOptions) *cobra.Command {
 	cmd.Flags().StringArrayVar(&lawFirms, "law-firm", nil, "law firm; repeatable or comma-separated")
 	cmd.Flags().StringArrayVar(&designCodes, "design-code", nil, "design search code; repeatable or comma-separated")
 	cmd.Flags().StringArrayVar(&designPrefixes, "design-prefix", nil, "design search prefix; repeatable or comma-separated")
+	cmd.Flags().StringArrayVar(&similarities, "similarity", nil, "similarity analysis type; repeatable or comma-separated; defaults to Exact,Fuzzy,Phonetic")
 	cmd.Flags().IntVar(&limit, "limit", 0, "result limit")
 	cmd.Flags().IntVar(&page, "page", 0, "result page")
 	cmd.Flags().StringVar(&sortFilingDate, "sort-filing-date", "", "sort filing date: asc or desc")

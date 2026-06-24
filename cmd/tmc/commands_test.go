@@ -82,6 +82,9 @@ func TestSearchTrademarksCommandBuildsOpenAPIRequest(t *testing.T) {
 	if !reflect.DeepEqual(gotBody["owners"], []any{"Nike Inc"}) {
 		t.Fatalf("owners body mismatch: %#v", gotBody["owners"])
 	}
+	if !reflect.DeepEqual(gotBody["similarity"], []any{"Exact", "Fuzzy", "Phonetic"}) {
+		t.Fatalf("similarity body mismatch: %#v", gotBody["similarity"])
+	}
 	if gotBody["limit"] != float64(5) {
 		t.Fatalf("limit body mismatch: %#v", gotBody["limit"])
 	}
@@ -95,6 +98,42 @@ func TestSearchTrademarksCommandBuildsOpenAPIRequest(t *testing.T) {
 	}
 	if output["ok"] != true {
 		t.Fatalf("output ok mismatch: %#v", output)
+	}
+}
+
+func TestSearchTrademarksCommandOverridesDefaultSimilarity(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/trademark/search" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":{"title":"OK","text":"ok"},"data":{"items":[]}}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_API_KEY", "test-key")
+
+	cmd := NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--endpoint", server.URL,
+		"search", "trademarks",
+		"--name", "Nike",
+		"--similarity", "Phonetic",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("command failed: %v stderr=%s", err, stderr.String())
+	}
+
+	if !reflect.DeepEqual(gotBody["similarity"], []any{"Phonetic"}) {
+		t.Fatalf("similarity body mismatch: %#v", gotBody["similarity"])
 	}
 }
 

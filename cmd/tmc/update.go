@@ -144,7 +144,7 @@ func maybeRunLightweightAutomaticUpdateCheck(cmd *cobra.Command, args []string) 
 	if cmd == nil || shouldSkipLightweightAutomaticUpdateCheck(cmd, args) {
 		return nil
 	}
-	result, ok := runAutomaticUpdateProbe()
+	result, ok := runAutomaticUpdateProbe(firstCommandArg(args) == "version")
 	if !ok || !result.UpdateAvailable {
 		return nil
 	}
@@ -155,7 +155,7 @@ func maybeRunAutomaticUpdateCheck(cmd *cobra.Command) {
 	if cmd == nil || shouldSkipAutomaticUpdateCheck(cmd) {
 		return
 	}
-	result, ok := runAutomaticUpdateProbe()
+	result, ok := runAutomaticUpdateProbe(cmd.CommandPath() == "tmc version")
 	if !ok || !result.UpdateAvailable {
 		return
 	}
@@ -177,10 +177,10 @@ func maybeRunAutomaticUpdateCheck(cmd *cobra.Command) {
 	_ = saveUpdateCheckCacheFromResult(result, "")
 }
 
-func runAutomaticUpdateProbe() (updateCheckResult, bool) {
+func runAutomaticUpdateProbe(force bool) (updateCheckResult, bool) {
 	cache, _ := loadUpdateCheckCache()
 	now := time.Now()
-	if !updateCheckDue(cache, now, updateCheckInterval()) {
+	if !force && !updateCheckDue(cache, now, updateCheckInterval()) {
 		return updateCheckResult{}, false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), automaticUpdateTimeout)

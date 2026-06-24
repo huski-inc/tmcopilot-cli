@@ -202,7 +202,7 @@ Supported environment variables:
 
 ## Updates
 
-`tmc` automatically checks npm package metadata at most once every two hours. In interactive terminals, when a newer version is available, it runs `npx --yes @tmcopilot/cli@<channel> update` and keeps all installer output on stderr so command stdout stays machine-readable. In non-interactive scripts and agent runs, the check is lightweight: it never installs automatically, and it writes only an update notice plus install command to stderr when an update is available. The check is silent when there is no newer version, when the network is unavailable, or when the binary is a local `dev` build.
+`tmc` automatically checks npm package metadata at most once every two hours. `tmc version` refreshes this check even when the automatic check cache is still fresh. In interactive terminals, when a newer version is available, it runs `npx --yes @tmcopilot/cli@<channel> update` and keeps all installer output on stderr so command stdout stays machine-readable. In non-interactive scripts and agent runs, the check is lightweight: it never installs automatically, and it writes only an update notice plus install command to stderr when an update is available. The check is silent when there is no newer version, when the network is unavailable, or when the binary is a local `dev` build.
 
 Check manually without installing:
 

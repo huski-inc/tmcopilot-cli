@@ -295,6 +295,49 @@ func TestExecuteNonInteractiveReportsLightweightUpdateOnSuccess(t *testing.T) {
 	}
 }
 
+func TestVersionForcesUpdateCheckWhenCacheIsFresh(t *testing.T) {
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"dist-tags": {"experimental": "0.1.0-experimental.16"},
+			"versions": {
+				"0.1.0-experimental.15": {},
+				"0.1.0-experimental.16": {}
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("TMCOPILOT_HOME", t.TempDir())
+	t.Setenv("TMCOPILOT_UPDATE_REGISTRY_URL", server.URL)
+	if err := saveUpdateCheckCache(updateCheckCache{
+		CheckedAt:            time.Now().UTC().Format(time.RFC3339),
+		CurrentVersion:       "v0.1.0-experimental.15",
+		LatestVersion:        "v0.1.0-experimental.15",
+		UpdateCheckSupported: true,
+		Channel:              "experimental",
+	}); err != nil {
+		t.Fatalf("save cache: %v", err)
+	}
+	oldVersion := version.Version
+	version.Version = "v0.1.0-experimental.15"
+	t.Cleanup(func() { version.Version = oldVersion })
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Execute([]string{"version"}, nil, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d stderr=%s", exitCode, stderr.String())
+	}
+	if requests != 1 {
+		t.Fatalf("update check requests = %d, want 1", requests)
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("Update available: tmc v0.1.0-experimental.15 -> v0.1.0-experimental.16")) {
+		t.Fatalf("stderr missing forced update notice: %s", stderr.String())
+	}
+}
+
 func TestExecuteNonInteractiveReportsLightweightUpdateAfterParseError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

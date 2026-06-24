@@ -1,6 +1,6 @@
 ---
 name: tmc-shared
-version: 1.4.4
+version: 1.4.5
 description: "TMCopilot CLI shared guidance: auth, output contracts, safety flags, large-result rules, and when to use catalog/schema-style discovery."
 cliHelp: "tmc --help"
 ---
@@ -49,7 +49,7 @@ For agent environments, prefer `tmc setup --no-wait`. Send the printed authoriza
 
 ## Updates
 
-Automatic update checks run at most once every two hours. Interactive terminals may run the npm installer when a newer version is available and keep installer output on stderr. Non-interactive scripts and agent runs never auto-install; they only print an update notice and install command to stderr. `tmc update check` returns a JSON envelope with `current_version`, `latest_version`, `update_available`, and `install_command` without installing.
+Automatic update checks run at most once every two hours. `tmc version` refreshes the update check even when the automatic check cache is still fresh. Interactive terminals may run the npm installer when a newer version is available and keep installer output on stderr. Non-interactive scripts and agent runs never auto-install; they only print an update notice and install command to stderr. `tmc update check` returns a JSON envelope with `current_version`, `latest_version`, `update_available`, and `install_command` without installing.
 
 Uninstall with `tmc uninstall --yes` after previewing with `tmc uninstall --dry-run`. From npm, `npx --yes @tmcopilot/cli@latest uninstall` removes persistent `tmc` and `tmcopilot` commands from common install directories. Config and credentials are kept unless `tmc uninstall --yes --remove-config` is used before removing the command.
 

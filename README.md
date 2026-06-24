@@ -228,6 +228,16 @@ Install the latest experimental release explicitly:
 npx --yes @tmcopilot/cli@experimental update
 ```
 
+Uninstall persistent CLI commands:
+
+```bash
+tmc uninstall --dry-run
+tmc uninstall --yes
+npx --yes @tmcopilot/cli@latest uninstall
+```
+
+`tmc uninstall` removes the local `tmc` and `tmcopilot` binaries from the current install directory and keeps config and credentials by default. Add `--remove-config` only when you also want to delete the local `~/.tmcopilot` config directory.
+
 The update check cache is stored at `~/.tmcopilot/update-check.json`.
 
 ## Common Commands

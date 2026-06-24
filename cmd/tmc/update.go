@@ -213,6 +213,9 @@ func shouldSkipAutomaticUpdateCheck(cmd *cobra.Command) bool {
 		if path == "tmc update" || strings.HasPrefix(path, "tmc update ") {
 			return true
 		}
+		if path == "tmc uninstall" {
+			return true
+		}
 		if flag := cmd.Root().PersistentFlags().Lookup("dry-run"); flag != nil && flag.Value.String() == "true" {
 			return true
 		}
@@ -227,7 +230,8 @@ func shouldSkipLightweightAutomaticUpdateCheck(cmd *cobra.Command, args []string
 	if isInteractiveStderr(cmd) {
 		return true
 	}
-	if firstCommandArg(args) == "update" {
+	switch firstCommandArg(args) {
+	case "update", "uninstall":
 		return true
 	}
 	return boolFlagEnabledInArgs(args, "dry-run")

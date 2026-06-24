@@ -513,7 +513,12 @@ func commandExamplesFor(cmd *cobra.Command, key string, safety *commandSafety, p
 		examples = append(examples, "tmc "+key+" --help")
 	}
 	if safety != nil && safety.SupportsDryRun && safety.SideEffect {
-		examples = append(examples, "tmc --dry-run --request-out request.json "+strings.TrimPrefix(commandUseLine(cmd, key), "tmc "))
+		command := strings.TrimPrefix(commandUseLine(cmd, key), "tmc ")
+		if _, ok := commandEndpointSpecs[key]; ok {
+			examples = append(examples, "tmc --dry-run --request-out request.json "+command)
+		} else {
+			examples = append(examples, "tmc --dry-run "+command)
+		}
 	}
 	if pagination != nil && pagination.SupportsPageAll {
 		examples = append(examples, "tmc "+key+" --page-all --format ndjson --output export.ndjson --manifest export.manifest.json")
@@ -713,6 +718,15 @@ var localCommandSafetySpecs = map[string]commandSafety{
 		SideEffect:     true,
 		SupportsDryRun: false,
 		Hint:           "checks npm metadata and updates the local update-check cache",
+	},
+	"uninstall": {
+		AuthRequired:   false,
+		ReadOnly:       false,
+		SideEffect:     true,
+		Destructive:    true,
+		SupportsDryRun: true,
+		RequiresYes:    true,
+		Hint:           "removes local tmc and tmcopilot binaries; keeps config unless --remove-config is passed",
 	},
 	"version": {
 		AuthRequired:   false,

@@ -127,9 +127,65 @@ function installPersistentCommands() {
   }
 }
 
+function isInsideDir(filePath, dir) {
+  if (!dir) return false;
+  const relative = path.relative(path.resolve(expandHome(dir)), path.resolve(filePath));
+  return relative === "" || (!!relative && !relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function canRunAsTMC(filePath) {
+  if (!fs.existsSync(filePath)) return false;
+  if (process.env.TMC_INSTALL_DIR && isInsideDir(filePath, process.env.TMC_INSTALL_DIR)) return true;
+  try {
+    const output = execFileSync(filePath, ["version"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+      env: {
+        ...process.env,
+        TMCOPILOT_NO_UPDATE_CHECK: "1",
+        TMC_NO_UPDATE_CHECK: "1",
+      },
+    });
+    return output.includes('"name":"tmc"') || output.includes('"name": "tmc"');
+  } catch (_) {
+    return false;
+  }
+}
+
+function removeIfSafe(filePath, removed) {
+  if (!fs.existsSync(filePath)) return;
+  if (!canRunAsTMC(filePath)) return;
+  fs.rmSync(filePath, { force: true });
+  removed.push(filePath);
+}
+
+function uninstallPersistentCommands() {
+  const removed = [];
+  const dirs = process.env.TMC_INSTALL_DIR ? uniqueDirs([process.env.TMC_INSTALL_DIR]) : installDirCandidates();
+  for (const dir of dirs) {
+    removeIfSafe(path.join(dir, aliasName), removed);
+    removeIfSafe(path.join(dir, commandName), removed);
+  }
+  if (removed.length === 0) {
+    console.log("No persistent tmc or tmcopilot commands found");
+    return;
+  }
+  console.log("Removed persistent TMCopilot CLI commands:");
+  for (const filePath of removed) {
+    console.log(`  ${filePath}`);
+  }
+  console.log("Local config and credentials were kept. Run `tmc uninstall --yes --remove-config` before uninstalling if you also want to remove them.");
+}
+
 if (args[0] === "install" || args[0] === "update") {
   installBinary();
   installPersistentCommands();
+  process.exit(0);
+}
+
+if (args[0] === "uninstall") {
+  uninstallPersistentCommands();
   process.exit(0);
 }
 

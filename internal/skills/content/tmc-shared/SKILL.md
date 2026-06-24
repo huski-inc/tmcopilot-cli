@@ -1,6 +1,6 @@
 ---
 name: tmc-shared
-version: 1.4.3
+version: 1.4.4
 description: "TMCopilot CLI shared guidance: auth, output contracts, safety flags, large-result rules, and when to use catalog/schema-style discovery."
 cliHelp: "tmc --help"
 ---
@@ -19,6 +19,7 @@ Read this first before using other TMCopilot CLI skills.
 - Use `tmc api catalog` to discover public generated Swagger endpoints. Internal endpoints are not exposed through CLI catalog, endpoint/schema inspection, or raw API fallback.
 - Use `tmc api schema METHOD /path` only for public endpoint debugging.
 - Use `tmc update check` when the user asks whether the local CLI is current. Automatic update checks may install newer releases only in interactive terminals; non-interactive agent runs only print an update notice to stderr when a newer release is available. Set `TMCOPILOT_NO_AUTO_UPDATE=1` when local binaries must not be modified.
+- Use `tmc uninstall --dry-run` to preview local CLI removal. Use `tmc uninstall --yes` to remove local `tmc` and `tmcopilot` binaries while keeping config. Add `--remove-config` only when the user explicitly wants local config and credentials deleted too.
 - Use `--output` for large JSON.
 - Use `--page-all` only on paginated list commands; it pages through the API one page at a time.
 - Prefer `--format ndjson --output file.ndjson --manifest file.manifest.json` for large exports.
@@ -49,6 +50,8 @@ For agent environments, prefer `tmc setup --no-wait`. Send the printed authoriza
 ## Updates
 
 Automatic update checks run at most once every two hours. Interactive terminals may run the npm installer when a newer version is available and keep installer output on stderr. Non-interactive scripts and agent runs never auto-install; they only print an update notice and install command to stderr. `tmc update check` returns a JSON envelope with `current_version`, `latest_version`, `update_available`, and `install_command` without installing.
+
+Uninstall with `tmc uninstall --yes` after previewing with `tmc uninstall --dry-run`. From npm, `npx --yes @tmcopilot/cli@latest uninstall` removes persistent `tmc` and `tmcopilot` commands from common install directories. Config and credentials are kept unless `tmc uninstall --yes --remove-config` is used before removing the command.
 
 ## Diagnostics
 

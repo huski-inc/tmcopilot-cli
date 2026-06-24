@@ -168,6 +168,7 @@ DISCOVERY:
 	root.AddCommand(newGapCommand(opts))
 	root.AddCommand(newFilesCommand(opts))
 	root.AddCommand(newSkillsCommand(opts))
+	root.AddCommand(newUninstallCommand(opts))
 
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		return fmt.Errorf("%s: %w", cmd.CommandPath(), err)
